@@ -1,0 +1,371 @@
+/* ══════════════════════════════════════════════════════════════
+   MawaridX — Signature Brand Theme
+   Exclusive utilities, patterns, and components
+   ══════════════════════════════════════════════════════════════ */
+
+/* ═════ 1. الخط الأساسي ═════ */
+html {
+  font-family: var(--font-arabic), var(--font-geist-sans), "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-feature-settings: "ss01", "ss02", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+html[lang="ar"] body {
+  font-family: var(--font-arabic), "Segoe UI", Tahoma, system-ui, sans-serif;
+  letter-spacing: -0.005em;
+}
+
+/* ═════ 2. Scrollbar حصري ═════ */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, oklch(60% 0.05 252 / 0.3), oklch(50% 0.05 252 / 0.3));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, oklch(48% 0.18 258 / 0.6), oklch(38% 0.15 258 / 0.6));
+  background-clip: content-box;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, oklch(40% 0.08 252 / 0.5), oklch(30% 0.05 252 / 0.5));
+  background-clip: content-box;
+}
+
+/* ═════ 3. النمط الإسلامي الهندسي — خلفية موقعة ═════ */
+.pattern-islamic {
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'><g fill='none' stroke='%23254fb8' stroke-width='0.6' stroke-opacity='0.08'><path d='M30 0 L60 30 L30 60 L0 30 Z'/><path d='M30 10 L50 30 L30 50 L10 30 Z'/><circle cx='30' cy='30' r='8'/><path d='M30 22 L38 30 L30 38 L22 30 Z'/></g></svg>");
+  background-size: 60px 60px;
+}
+.dark .pattern-islamic {
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'><g fill='none' stroke='%23a5b8ff' stroke-width='0.6' stroke-opacity='0.06'><path d='M30 0 L60 30 L30 60 L0 30 Z'/><path d='M30 10 L50 30 L30 50 L10 30 Z'/><circle cx='30' cy='30' r='8'/><path d='M30 22 L38 30 L30 38 L22 30 Z'/></g></svg>");
+}
+
+.pattern-dots {
+  background-image: radial-gradient(circle, oklch(48% 0.18 258 / 0.12) 1px, transparent 1.5px);
+  background-size: 20px 20px;
+}
+.dark .pattern-dots {
+  background-image: radial-gradient(circle, oklch(80% 0.1 258 / 0.1) 1px, transparent 1.5px);
+}
+
+/* ═════ 4. Mesh / Aurora Background ═════ */
+.mesh-bg {
+  background:
+    radial-gradient(at 12% 8%,   oklch(95% 0.06 258) 0px, transparent 45%),
+    radial-gradient(at 88% 12%,  oklch(96% 0.05 75)  0px, transparent 45%),
+    radial-gradient(at 50% 95%,  oklch(96% 0.05 195) 0px, transparent 45%);
+}
+.dark .mesh-bg {
+  background:
+    radial-gradient(at 12% 8%,   oklch(25% 0.08 258) 0px, transparent 40%),
+    radial-gradient(at 88% 12%,  oklch(22% 0.06 75)  0px, transparent 40%),
+    radial-gradient(at 50% 95%,  oklch(20% 0.06 195) 0px, transparent 40%);
+}
+
+/* ═════ 5. Gradient توقيعي للعلامة ═════ */
+.bg-brand-gradient {
+  background: linear-gradient(135deg,
+    oklch(42% 0.2 258) 0%,
+    oklch(48% 0.18 258) 40%,
+    oklch(55% 0.16 270) 100%);
+}
+.bg-brand-gradient-soft {
+  background: linear-gradient(135deg,
+    oklch(96% 0.04 258) 0%,
+    oklch(98% 0.02 275) 100%);
+}
+.bg-gold-gradient {
+  background: linear-gradient(135deg,
+    oklch(72% 0.14 75) 0%,
+    oklch(78% 0.13 85) 50%,
+    oklch(72% 0.12 65) 100%);
+}
+.text-brand-gradient {
+  background: linear-gradient(135deg, oklch(45% 0.2 258), oklch(62% 0.18 280));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.text-gold-gradient {
+  background: linear-gradient(135deg, oklch(68% 0.14 75), oklch(78% 0.12 85));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ═════ 6. Glassmorphism حصري ═════ */
+.glass {
+  background: oklch(100% 0 0 / 0.7);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid oklch(100% 0 0 / 0.4);
+}
+.dark .glass {
+  background: oklch(20% 0.02 252 / 0.7);
+  border: 1px solid oklch(100% 0 0 / 0.08);
+}
+.glass-strong {
+  background: oklch(100% 0 0 / 0.85);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border: 1px solid oklch(100% 0 0 / 0.5);
+}
+.dark .glass-strong {
+  background: oklch(22% 0.02 252 / 0.85);
+  border: 1px solid oklch(100% 0 0 / 0.1);
+}
+
+/* ═════ 7. ظلال حصرية ملونة ═════ */
+.shadow-brand {
+  box-shadow:
+    0 1px 2px oklch(40% 0.15 258 / 0.08),
+    0 4px 12px oklch(40% 0.15 258 / 0.08),
+    0 12px 32px oklch(40% 0.15 258 / 0.06);
+}
+.shadow-brand-lg {
+  box-shadow:
+    0 2px 4px oklch(40% 0.15 258 / 0.1),
+    0 8px 20px oklch(40% 0.15 258 / 0.12),
+    0 24px 56px oklch(40% 0.15 258 / 0.1);
+}
+.shadow-gold {
+  box-shadow:
+    0 1px 2px oklch(55% 0.14 75 / 0.12),
+    0 8px 24px oklch(60% 0.14 75 / 0.15);
+}
+.shadow-soft {
+  box-shadow:
+    0 1px 2px oklch(30% 0.02 252 / 0.04),
+    0 2px 8px oklch(30% 0.02 252 / 0.04),
+    0 4px 16px oklch(30% 0.02 252 / 0.03);
+}
+.dark .shadow-soft,
+.dark .shadow-brand,
+.dark .shadow-brand-lg {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.35),
+    0 4px 16px rgba(0, 0, 0, 0.3),
+    0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+/* ═════ 8. بطاقة MawaridX الموقّعة ═════ */
+.card-brand {
+  background: var(--brand-surface);
+  border: 1px solid var(--brand-border);
+  border-radius: 1rem;
+  box-shadow:
+    0 1px 2px oklch(30% 0.02 252 / 0.04),
+    0 4px 12px oklch(30% 0.02 252 / 0.04);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.2s ease;
+}
+.card-brand:hover {
+  transform: translateY(-2px);
+  border-color: oklch(48% 0.18 258 / 0.3);
+  box-shadow:
+    0 2px 4px oklch(40% 0.15 258 / 0.08),
+    0 12px 28px oklch(40% 0.15 258 / 0.1);
+}
+.dark .card-brand:hover {
+  border-color: oklch(68% 0.16 258 / 0.4);
+}
+
+/* ═════ 9. زر MawaridX الموقّع ═════ */
+.btn-brand {
+  position: relative;
+  background: linear-gradient(135deg, oklch(42% 0.2 258), oklch(50% 0.18 268));
+  color: white;
+  font-weight: 600;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow:
+    inset 0 1px 0 oklch(100% 0 0 / 0.15),
+    0 2px 8px oklch(40% 0.15 258 / 0.35);
+}
+.btn-brand::before {
+  content: "";
+  position: absolute;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, oklch(100% 0 0 / 0.25), transparent);
+  transition: left 0.6s ease;
+}
+.btn-brand:hover::before { left: 100%; }
+.btn-brand:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 oklch(100% 0 0 / 0.2),
+    0 4px 16px oklch(40% 0.15 258 / 0.45);
+}
+
+/* ═════ 10. Badges موقّعة ═════ */
+.badge-brand {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.7rem; font-weight: 600;
+  border-radius: 999px;
+  background: var(--brand-primary-soft);
+  color: var(--brand-primary);
+  border: 1px solid oklch(48% 0.18 258 / 0.2);
+}
+.dark .badge-brand {
+  background: oklch(48% 0.18 258 / 0.15);
+  color: oklch(80% 0.12 258);
+  border-color: oklch(68% 0.16 258 / 0.3);
+}
+.badge-gold {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.7rem; font-weight: 600;
+  border-radius: 999px;
+  background: var(--brand-gold-soft);
+  color: oklch(50% 0.14 75);
+  border: 1px solid oklch(72% 0.14 75 / 0.3);
+}
+.dark .badge-gold {
+  background: oklch(72% 0.14 75 / 0.15);
+  color: oklch(85% 0.13 85);
+  border-color: oklch(72% 0.14 75 / 0.3);
+}
+
+/* ═════ 11. حلقة التركيز المخصصة ═════ */
+*:focus-visible {
+  outline: 2px solid oklch(48% 0.18 258 / 0.5);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ═════ 12. الحركات التوقيعية ═════ */
+@keyframes brand-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes brand-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes brand-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes brand-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes brand-pulse-ring {
+  0%   { box-shadow: 0 0 0 0 oklch(48% 0.18 258 / 0.5); }
+  70%  { box-shadow: 0 0 0 10px oklch(48% 0.18 258 / 0); }
+  100% { box-shadow: 0 0 0 0 oklch(48% 0.18 258 / 0); }
+}
+@keyframes brand-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+.animate-fade-up { animation: brand-fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-fade-in { animation: brand-fade-in 0.4s ease both; }
+.animate-scale-in { animation: brand-scale-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-pulse-ring { animation: brand-pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.animate-float { animation: brand-float 3s ease-in-out infinite; }
+.animate-shimmer {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    oklch(100% 0 0 / 0.4) 50%,
+    transparent 100%);
+  background-size: 200% 100%;
+  animation: brand-shimmer 1.5s infinite;
+}
+
+/* ═════ 13. عناصر Stagger — تسلسل ظهور ═════ */
+.stagger > * { animation: brand-fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.stagger > *:nth-child(1)  { animation-delay: 0.02s; }
+.stagger > *:nth-child(2)  { animation-delay: 0.05s; }
+.stagger > *:nth-child(3)  { animation-delay: 0.09s; }
+.stagger > *:nth-child(4)  { animation-delay: 0.13s; }
+.stagger > *:nth-child(5)  { animation-delay: 0.17s; }
+.stagger > *:nth-child(6)  { animation-delay: 0.2s; }
+.stagger > *:nth-child(7)  { animation-delay: 0.23s; }
+.stagger > *:nth-child(8)  { animation-delay: 0.26s; }
+.stagger > *:nth-child(n+9){ animation-delay: 0.3s; }
+
+/* ═════ 14. اختيار النص ═════ */
+::selection { background: oklch(48% 0.18 258 / 0.22); color: var(--brand-ink); }
+.dark ::selection { background: oklch(68% 0.16 258 / 0.35); color: white; }
+
+/* ═════ 15. حدود متدرّجة ═════ */
+.border-gradient {
+  position: relative;
+  background: var(--brand-surface);
+  border-radius: 1rem;
+}
+.border-gradient::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, oklch(48% 0.18 258), oklch(72% 0.14 75));
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ═════ 16. مؤشر قراءة نجمة لامعة ═════ */
+.star-shine {
+  position: relative;
+}
+.star-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 30%, oklch(100% 0 0 / 0.5), transparent 40%);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* ═════ 17. Divider موقّع ═════ */
+.divider-brand {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--brand-border) 20%, var(--brand-border) 80%, transparent);
+}
+
+/* ═════ 18. حواف ناعمة للصور والأفاتار ═════ */
+.ring-brand {
+  box-shadow: 0 0 0 2px var(--brand-surface), 0 0 0 4px oklch(48% 0.18 258 / 0.3);
+}
+
+/* ═════ 19. تأثير تحميل Shimmer ═════ */
+.skeleton-brand {
+  background: linear-gradient(90deg,
+    var(--brand-border) 0%,
+    oklch(95% 0.01 252) 50%,
+    var(--brand-border) 100%);
+  background-size: 200% 100%;
+  animation: brand-shimmer 1.4s ease-in-out infinite;
+  border-radius: 8px;
+}
+.dark .skeleton-brand {
+  background: linear-gradient(90deg,
+    oklch(25% 0.02 252) 0%,
+    oklch(30% 0.02 252) 50%,
+    oklch(25% 0.02 252) 100%);
+  background-size: 200% 100%;
+}
+
+/* ═════ 20. احترام Reduced Motion ═════ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

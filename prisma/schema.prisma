@@ -1,0 +1,552 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ==============================
+// الشركات (Multi-Tenant)
+// ==============================
+
+model Company {
+  id             String   @id @default(cuid())
+  name           String
+  commercialReg  String?  // السجل التجاري
+  adminEmail     String   @unique
+  adminName      String?
+  phone          String?
+  plan           String   @default("trial") // trial, basic, growth, business, enterprise
+  maxEmployees   Int      @default(10)
+  status         String   @default("active") // active, suspended, expired
+  logo           String?
+  primaryColor   String?  // لون البراند المخصص
+  notes          String?
+  expiresAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status])
+}
+
+// ==============================
+// إعدادات النظام
+// ==============================
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  managerId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ==============================
+// المستخدمون والصلاحيات
+// ==============================
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  password          String
+  role              String    @default("employee")
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  employee Employee?
+}
+
+// ==============================
+// الموظفون
+// ==============================
+
+model Employee {
+  id             String    @id @default(cuid())
+  employeeNumber String    @unique
+  firstName      String
+  lastName       String
+  arabicName     String?
+  email          String    @unique
+  phone          String?
+  nationalId     String?   @unique
+  birthDate      DateTime?
+  gender         String?
+  maritalStatus  String?
+  address        String?
+  city           String?
+  buildingNumber String?
+  streetName     String?
+  region         String?
+  postalCode     String?
+  photo          String?
+
+  religion       String?
+  idType         String?   // national_id, iqama, passport
+
+  jobTitle       String?
+  position       String    @default("employee")
+  department     String?
+  employmentType   String    @default("full_time")
+  startDate        DateTime  @default(now())
+  endDate          DateTime?
+  contractDuration Float?    // بالسنوات (1، 2، أو مخصص)
+  noticePeriodDays Int       @default(60) // أيام الإشعار قبل الإفساخ (افتراضي 60 = شهرين)
+  status           String    @default("active")
+
+  basicSalary          Float     @default(0)
+  housingAllowance     Float     @default(0)
+  transportAllowance   Float     @default(0)
+  otherAllowance       Float     @default(0)
+  bankName       String?
+  iban           String?
+
+  nationality    String    @default("saudi") // saudi, non_saudi
+  iqamaExpiry    DateTime?
+
+  workLocationId    String?
+  workLocation      WorkLocation?          @relation(fields: [workLocationId], references: [id])
+  multiLocation     Boolean                @default(false)
+  assignedLocations EmployeeWorkLocation[]
+
+  managerId      String?
+  manager        Employee?  @relation("EmployeeManager", fields: [managerId], references: [id])
+  subordinates   Employee[] @relation("EmployeeManager")
+
+  userId         String?   @unique
+  user           User?     @relation(fields: [userId], references: [id])
+
+  attendances    Attendance[]
+  leaves         Leave[]
+  salaries       Salary[]
+  evaluations    Evaluation[]
+  trainings      EmployeeTraining[]
+  documents      Document[]
+  requests       Request[]
+  leaveBalances  LeaveBalance[]
+  custodies      Custody[]
+  deductionRules SalaryDeductionRule[]
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+// ==============================
+// مواقع العمل
+// ==============================
+
+model WorkLocation {
+  id          String       @id @default(cuid())
+  name        String       // اسم الفرع / الموقع
+  description String?
+  address     String?
+  deviceId    String?      // معرف جهاز البصمة
+  latitude    Float?       // خط العرض
+  longitude   Float?       // خط الطول
+  radius      Int          @default(200) // نطاق البصمة بالمتر
+  active      Boolean      @default(true)
+  employees             Employee[]
+  attendances           Attendance[]
+  checkInAttendances    Attendance[]         @relation("AttCheckIn")
+  checkOutAttendances   Attendance[]         @relation("AttCheckOut")
+  employeeLocations     EmployeeWorkLocation[]
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model EmployeeWorkLocation {
+  id         String       @id @default(cuid())
+  employeeId String
+  employee   Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  locationId String
+  location   WorkLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  createdAt  DateTime     @default(now())
+
+  @@unique([employeeId, locationId])
+}
+
+// ==============================
+// الحضور والانصراف
+// ==============================
+
+model Attendance {
+  id             String        @id @default(cuid())
+  employeeId     String
+  employee       Employee      @relation(fields: [employeeId], references: [id])
+  date           DateTime
+  checkIn        DateTime?
+  checkOut       DateTime?
+  status         String        @default("present")
+  notes          String?
+  workHours      Float?
+  workLocationId     String?
+  workLocation       WorkLocation? @relation(fields: [workLocationId], references: [id])
+  checkInLocationId  String?
+  checkInLocation    WorkLocation? @relation("AttCheckIn",  fields: [checkInLocationId],  references: [id])
+  checkOutLocationId String?
+  checkOutLocation   WorkLocation? @relation("AttCheckOut", fields: [checkOutLocationId], references: [id])
+  overtimeMinutes    Int?          @default(0)
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([employeeId, date])
+  @@index([date, status])
+}
+
+// ==============================
+// الإجازات
+// ==============================
+
+model Leave {
+  id           String    @id @default(cuid())
+  employeeId   String
+  employee     Employee  @relation(fields: [employeeId], references: [id])
+  type         String
+  startDate    DateTime
+  endDate      DateTime
+  days         Int
+  reason       String?
+  attachmentUrl String?  // مرفق العذر الطبي للإجازة المرضية
+  status       String    @default("pending") // pending, manager_approved, approved, rejected
+  managerApprovedBy String?
+  managerApprovedAt DateTime?
+  approvedBy   String?
+  approvedAt   DateTime?
+  notes        String?
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([employeeId, status])
+}
+
+// ==============================
+// الرواتب
+// ==============================
+
+model Salary {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+  month           Int
+  year            Int
+  basicSalary     Float
+  allowances      Float     @default(0)
+  deductions      Float     @default(0)
+  bonus           Float     @default(0)
+  overtimePay     Float     @default(0)
+  gosiEmployee    Float     @default(0)  // نصيب الموظف في التأمينات — 9% للسعودي
+  gosiEmployer    Float     @default(0)  // نصيب صاحب العمل — 9% سعودي / 2% غير سعودي
+  netSalary       Float
+  status          String    @default("pending")
+  paidAt          DateTime?
+  notes           String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([employeeId, month, year])
+}
+
+model SalaryDeductionRule {
+  id            String    @id @default(cuid())
+  name          String
+  type          String    @default("fixed")  // "fixed" | "percentage"
+  amount        Float                         // مبلغ ثابت أو نسبة مئوية (e.g. 5 = 5%)
+  employeeId    String?
+  employee      Employee? @relation(fields: [employeeId], references: [id])
+  isActive      Boolean   @default(true)
+  totalMonths   Int       @default(0)         // 0 = دائم، >0 = عدد أشهر الأقساط
+  appliedMonths Int       @default(0)         // عدد الأشهر المطبقة حتى الآن
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// ==============================
+// التوظيف
+// ==============================
+
+model Recruitment {
+  id              String        @id @default(cuid())
+  jobTitle        String
+  department      String?
+  description     String?
+  requirements    String?
+  status          String        @default("open")
+  openDate        DateTime      @default(now())
+  closeDate       DateTime?
+  applications    Application[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Application {
+  id              String      @id @default(cuid())
+  recruitmentId   String
+  recruitment     Recruitment @relation(fields: [recruitmentId], references: [id])
+  applicantName   String
+  email           String
+  phone           String?
+  resumeUrl       String?
+  status          String      @default("new")
+  notes           String?
+  interviewDate   DateTime?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+// ==============================
+// تقييم الأداء
+// ==============================
+
+model Evaluation {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+  period          String
+  year            Int
+  score           Float?    // النتيجة النهائية من 5
+  grade           String?   // ممتاز / جيد جداً / جيد / مقبول / ضعيف
+  answers         String?   // JSON: { "q1": 8, "q2": 7, ... }
+  strengths       String?
+  improvements    String?
+  goals           String?
+  evaluatorId     String?
+  evaluatorName   String?
+  status          String    @default("draft")
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ==============================
+// التدريب والتطوير
+// ==============================
+
+model Training {
+  id              String    @id @default(cuid())
+  title           String
+  description     String?
+  instructor      String?
+  startDate       DateTime?
+  endDate         DateTime?
+  duration        Int?
+  location        String?
+  type            String    @default("internal")
+  status          String    @default("planned")
+  employees       EmployeeTraining[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model EmployeeTraining {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+  trainingId      String
+  training        Training  @relation(fields: [trainingId], references: [id])
+  status          String    @default("enrolled")
+  completedAt     DateTime?
+  certificate     String?
+
+  @@unique([employeeId, trainingId])
+}
+
+// ==============================
+// الوثائق
+// ==============================
+
+model Request {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  type        String    // leave, attendance_fix, loan, custody, exit_return, resignation, letter
+  status      String    @default("pending") // pending, manager_approved, approved, rejected
+  title       String
+  details     String?
+  // حقول خاصة بكل نوع
+  startDate   DateTime?
+  endDate     DateTime?
+  amount      Float?    // للسلفة
+  returnDate  DateTime? // للسلفة
+  exitTime    DateTime? // للخروج والعودة / الوقت المصحح للبصمة
+  returnTime  DateTime? // للخروج والعودة
+  checkType   String?   // للبصمة: "in" | "out"
+  // الموافقة
+  managerId   String?   // المدير المباشر
+  managerNote String?
+  managerAt   DateTime?
+  hrNote      String?
+  hrAt        DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([employeeId, status])
+  @@index([managerId, status])
+}
+
+model Announcement {
+  id          String    @id @default(cuid())
+  title       String
+  content     String
+  scope       String    @default("company") // company = الشركة كلها, department = قسم معين
+  department  String?   // اسم القسم إذا كان الإعلان لقسم معين
+  authorId    String
+  authorName  String
+  priority    String    @default("normal") // normal, important, urgent
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  recipientId String    // Employee ID
+  title       String
+  message     String
+  type        String    @default("info") // info, request, approval, rejection
+  relatedId   String?   // ID of related entity (request, etc.)
+  read        Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+}
+
+model LeaveBalance {
+  id          String @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  year        Int
+  annual      Int    @default(30)  // رصيد سنوي
+  sick        Int    @default(15)  // رصيد مرضي
+  emergency   Int    @default(5)   // رصيد طارئ
+  usedAnnual  Int    @default(0)
+  usedSick    Int    @default(0)
+  usedEmergency Int  @default(0)
+
+  @@unique([employeeId, year])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  userName    String?
+  action      String   // create, update, delete, approve, reject, login
+  entity      String   // employee, request, salary, leave, attendance, announcement
+  entityId    String?
+  details     String?
+  createdAt   DateTime @default(now())
+}
+
+model Document {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+  type            String
+  name            String
+  fileUrl         String?
+  expiryDate      DateTime?
+  notes           String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ==============================
+// العهد
+// ==============================
+
+model Custody {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  type        String    // leave_balance, travel_ticket, equipment, other
+  title       String
+  description String?
+  quantity    Float?
+  unit        String?   // يوم، قطعة، إلخ
+  status      String    @default("pending") // pending, approved, rejected
+  createdBy   String    // اسم من أضاف العهدة
+  approvedAt  DateTime?
+  employeeNote String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ==============================
+// مستندات المنشأة
+// ==============================
+
+model CompanyDocument {
+  id               String   @id @default(cuid())
+  title            String
+  description      String?
+  category         String   @default("other")
+  // policy | procedure | form | contract | regulation | hr | other
+  fileUrl          String?
+  fileName         String?
+  fileSize         Int?
+  fileType         String?
+
+  // أذونات الوصول
+  // all | managers | department | specific
+  accessLevel      String   @default("all")
+  accessDepts      String?  // JSON: ["قسم التقنية", "المبيعات"]
+  accessEmployeeIds String? // JSON: ["id1", "id2"]
+
+  // انتهاء الصلاحية والتذكير
+  expiryDate        DateTime?
+  notifyDaysBefore  Int      @default(30)
+  notifiedAt        DateTime?
+
+  isActive         Boolean  @default(true)
+  createdBy        String
+  creatorName      String?
+
+  downloads        CompanyDocumentDownload[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model CompanyDocumentDownload {
+  id           String          @id @default(cuid())
+  documentId   String
+  document     CompanyDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  employeeId   String
+  employeeName String?
+  downloadedAt DateTime        @default(now())
+
+  @@index([documentId])
+  @@index([employeeId])
+}
+
+// ==============================
+// إشعارات Push
+// ==============================
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
