@@ -30,8 +30,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files (NEVER commit real secrets — only the template)
+.env
+.env.*
+!.env.example
 
 # vercel
 .vercel
@@ -75,3 +77,12 @@ Thumbs.db
 
 # Scripts عينات/اختبار (لا ترفعها لأنها قد تحوي كلمات مرور)
 check_users.mjs
+
+# SSL certificates (mounted into nginx at runtime, never in repo)
+/ssl
+*.pem
+*.key
+*.crt
+
+# Backups (mounted as Docker volume in production)
+/backups
