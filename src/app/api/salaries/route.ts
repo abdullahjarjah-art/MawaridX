@@ -94,7 +94,13 @@ export async function POST(req: NextRequest) {
 
   if (body.bulk) {
     const { month, year } = body;
-    const [employees, existing, deductionRules] = await Promise.all([
+    const m = Number(month);
+    const y = Number(year);
+    // نطاق الشهر لجلب الجزاءات
+    const monthStart = new Date(y, m - 1, 1);
+    const monthEnd   = new Date(y, m, 0, 23, 59, 59);
+
+    const [employees, existing, deductionRules, disciplinaryDeductions] = await Promise.all([
       prisma.employee.findMany({
         where: { status: "active" },
         select: {
@@ -103,11 +109,22 @@ export async function POST(req: NextRequest) {
         },
       }),
       prisma.salary.findMany({
-        where: { month: Number(month), year: Number(year) },
+        where: { month: m, year: y },
         select: { employeeId: true },
       }),
       prisma.salaryDeductionRule.findMany({ where: { isActive: true } }),
+      // جلب خصومات الجزاءات لهذا الشهر
+      prisma.disciplinary.findMany({
+        where: {
+          type: "deduction",
+          status: "active",
+          penalty: { gt: 0 },
+          date: { gte: monthStart, lte: monthEnd },
+        },
+        select: { employeeId: true, penalty: true, reason: true },
+      }),
     ]);
+
     const existingIds = new Set(existing.map((s) => s.employeeId));
     const toCreate = employees.filter((e) => !existingIds.has(e.id));
     if (toCreate.length > 0) {
@@ -116,12 +133,19 @@ export async function POST(req: NextRequest) {
         (r) => r.totalMonths === 0 || r.appliedMonths < r.totalMonths
       );
 
+      // فهرسة خصومات الجزاءات حسب الموظف
+      const discByEmp = new Map<string, { amount: number; reasons: string[] }>();
+      for (const d of disciplinaryDeductions) {
+        const cur = discByEmp.get(d.employeeId) ?? { amount: 0, reasons: [] };
+        cur.amount += d.penalty ?? 0;
+        cur.reasons.push(d.reason);
+        discByEmp.set(d.employeeId, cur);
+      }
+
       await prisma.salary.createMany({
         data: toCreate.map((e) => {
           const { gosiEmployee, gosiEmployer } = calcGosi(e.basicSalary, e.nationality);
-          // بدلات الموظف من ملفه
           const totalAllowances = (e.housingAllowance ?? 0) + (e.transportAllowance ?? 0) + (e.otherAllowance ?? 0);
-          // جمع الخصومات المنطبقة على هذا الموظف (ثابتة أو نسبة)
           const fixedDeductions = activeRules
             .filter((r) => r.employeeId === null || r.employeeId === e.id)
             .reduce((sum, r) => {
@@ -130,19 +154,24 @@ export async function POST(req: NextRequest) {
                 : r.amount;
               return sum + val;
             }, 0);
+          const disc = discByEmp.get(e.id);
+          const discAmount = disc?.amount ?? 0;
+          const totalDeductions = fixedDeductions + discAmount;
+          const notes = disc ? `خصم جزاء: ${disc.reasons.join(" | ")} (${discAmount} ر.س)` : undefined;
           return {
             employeeId: e.id,
-            month: Number(month),
-            year: Number(year),
+            month: m,
+            year: y,
             basicSalary: e.basicSalary,
             allowances: totalAllowances,
-            deductions: fixedDeductions,
+            deductions: totalDeductions,
             bonus: 0,
             overtimePay: 0,
             gosiEmployee,
             gosiEmployer,
-            netSalary: e.basicSalary + totalAllowances - fixedDeductions,
+            netSalary: e.basicSalary + totalAllowances - totalDeductions,
             status: "pending",
+            notes,
           };
         }),
       });
