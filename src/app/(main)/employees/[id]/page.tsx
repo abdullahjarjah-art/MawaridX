@@ -17,7 +17,7 @@ import {
   Camera, RefreshCw, Send, BanIcon, ShieldAlert, FileSpreadsheet, BadgeCheck,
   Scroll,
 } from "lucide-react";
-import { generateSalaryCertificate, generateEmploymentLetter, generateExperienceLetter } from "@/lib/letters-pdf";
+
 import { EmployeeAvatar } from "@/components/employee-avatar";
 
 const monthNames = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
@@ -985,9 +985,9 @@ export default function EmployeeProfilePage() {
           </div>
           <div className="flex flex-wrap gap-2">
             {[
-              { label: "شهادة راتب", fn: () => generateSalaryCertificate({ employeeName: `${emp.firstName} ${emp.lastName}`, arabicName: (emp as any).arabicName, employeeNumber: emp.employeeNumber, jobTitle: emp.jobTitle, department: emp.department, nationality: emp.nationality, startDate: emp.startDate, basicSalary: emp.basicSalary, housingAllowance: (emp as any).housingAllowance ?? 0, transportAllowance: (emp as any).transportAllowance ?? 0, otherAllowance: (emp as any).otherAllowance ?? 0 }) },
-              { label: "خطاب توظيف", fn: () => generateEmploymentLetter({ employeeName: `${emp.firstName} ${emp.lastName}`, employeeNumber: emp.employeeNumber, jobTitle: emp.jobTitle, department: emp.department, startDate: emp.startDate }) },
-              { label: "شهادة خبرة", fn: () => generateExperienceLetter({ employeeName: `${emp.firstName} ${emp.lastName}`, employeeNumber: emp.employeeNumber, jobTitle: emp.jobTitle, department: emp.department, startDate: emp.startDate, endDate: emp.endDate }) },
+              { label: "شهادة راتب",  fn: () => window.open(`/employees/${id}/letter?type=salary`,     "_blank") },
+              { label: "خطاب توظيف", fn: () => window.open(`/employees/${id}/letter?type=employment`, "_blank") },
+              { label: "شهادة خبرة", fn: () => window.open(`/employees/${id}/letter?type=experience`, "_blank") },
             ].map(({ label, fn }) => (
               <Button key={label} variant="outline" size="sm" className="gap-1.5" onClick={fn}>
                 <Download className="h-3.5 w-3.5" />
