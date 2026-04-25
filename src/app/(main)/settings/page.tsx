@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, Save, Clock, Timer, Mail, Send, ArrowLeft, CalendarCheck, RefreshCw, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, Users, User } from "lucide-react";
+import { MapPin, Save, Clock, Timer, Mail, Send, ArrowLeft, CalendarCheck, RefreshCw, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, Users, User, Database, Download, Trash2, ShieldCheck } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
 import { useLang } from "@/components/lang-provider";
@@ -47,6 +47,32 @@ export default function SettingsPage() {
   const [showCarryDetails, setShowCarryDetails] = useState(false);
   const [carryPreview, setCarryPreview] = useState<{ name: string; remainAnnual: number; remainSick: number; remainEmergency: number }[] | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  // النسخ الاحتياطية
+  type BackupItem = { name: string; sizeBytes: number; createdAt: string };
+  const [backups, setBackups] = useState<BackupItem[]>([]);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [backupMsg, setBackupMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  const loadBackups = () =>
+    fetch("/api/admin/backup").then(r => r.json()).then(d => setBackups(Array.isArray(d) ? d : []));
+
+  const doBackup = async () => {
+    setBackupLoading(true); setBackupMsg(null);
+    const res = await fetch("/api/admin/backup", { method: "POST" });
+    const data = await res.json();
+    setBackupMsg({ text: res.ok ? data.message : data.error, ok: res.ok });
+    if (res.ok) loadBackups();
+    setBackupLoading(false);
+  };
+
+  const doDelete = async (name: string) => {
+    if (!confirm(`حذف "${name}"؟`)) return;
+    await fetch(`/api/admin/backup?name=${encodeURIComponent(name)}`, { method: "DELETE" });
+    loadBackups();
+  };
+
+  const fmtSize = (b: number) => b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`;
+
   // وضع الترحيل: للجميع أو موظف محدد
   const [carryMode, setCarryMode] = useState<"all" | "single">("all");
   const [carryEmpSearch, setCarryEmpSearch] = useState("");
@@ -107,6 +133,7 @@ export default function SettingsPage() {
   useEffect(() => {
     fetch("/api/settings/attendance").then(r => r.json()).then(d => { if (d) setAtt(d); });
     fetch("/api/settings/smtp").then(r => r.json()).then(d => { if (d) setSmtp(s => ({ ...s, ...d })); });
+    loadBackups();
   }, []);
 
   const saveAtt = async () => {
@@ -496,6 +523,77 @@ export default function SettingsPage() {
                   </table>
                 </div>
               )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ===== النسخ الاحتياطية ===== */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Database className="h-4 w-4 text-emerald-600" />
+            {t("النسخ الاحتياطية")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start gap-4 mb-5 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+            <ShieldCheck className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+            <div className="text-sm text-emerald-800">
+              <p className="font-medium">نسخ تلقائية كل 24 ساعة</p>
+              <p className="text-xs text-emerald-600 mt-0.5">يحتفظ النظام بآخر 14 نسخة — يمكنك أيضاً إنشاء نسخة يدوية في أي وقت</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 mb-5">
+            <Button onClick={doBackup} disabled={backupLoading} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+              {backupLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
+              {backupLoading ? t("جارٍ الإنشاء...") : t("إنشاء نسخة الآن")}
+            </Button>
+            {backupMsg && (
+              <span className={`text-sm flex items-center gap-1.5 ${backupMsg.ok ? "text-green-600" : "text-red-600"}`}>
+                {backupMsg.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                {backupMsg.text}
+              </span>
+            )}
+          </div>
+
+          {backups.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">لا توجد نسخ احتياطية بعد</p>
+          ) : (
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <div className="bg-gray-50 px-4 py-2 text-xs font-medium text-gray-500 border-b flex items-center justify-between">
+                <span>{backups.length} نسخة احتياطية</span>
+                <span>آخر نسخة: {new Date(backups[0].createdAt).toLocaleString("ar-SA")}</span>
+              </div>
+              <div className="divide-y max-h-72 overflow-y-auto">
+                {backups.map(b => (
+                  <div key={b.name} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50">
+                    <Database className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-mono text-gray-700 truncate">{b.name}</p>
+                      <p className="text-xs text-gray-400">
+                        {new Date(b.createdAt).toLocaleString("ar-SA")} · {fmtSize(b.sizeBytes)}
+                      </p>
+                    </div>
+                    <a
+                      href={`/api/admin/backup/download?name=${encodeURIComponent(b.name)}`}
+                      download={b.name}
+                      className="p-1.5 rounded-lg text-sky-500 hover:bg-sky-50 transition-colors"
+                      title="تحميل"
+                    >
+                      <Download className="h-4 w-4" />
+                    </a>
+                    <button
+                      onClick={() => doDelete(b.name)}
+                      className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-50 transition-colors"
+                      title="حذف"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </CardContent>
