@@ -140,9 +140,43 @@ model Employee {
   custodies      Custody[]
   deductionRules SalaryDeductionRule[]
   disciplinaries Disciplinary[]
+  shifts         EmployeeShift[]
 
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+}
+
+// ==============================
+// الشيفتات / جداول الدوام
+// ==============================
+
+model Shift {
+  id            String          @id @default(cuid())
+  name          String          // صباحي، مسائي، ليلي...
+  checkInTime   String          // "08:00"
+  checkOutTime  String          // "17:00"
+  breakMinutes  Int             @default(60)
+  workDays      String          @default("0,1,2,3,4") // 0=أحد...6=سبت
+  color         String          @default("#0284c7")
+  isActive      Boolean         @default(true)
+  employees     EmployeeShift[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model EmployeeShift {
+  id         String    @id @default(cuid())
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  shiftId    String
+  shift      Shift     @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  startDate  DateTime  @default(now())
+  endDate    DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@unique([employeeId, shiftId])
+  @@index([employeeId])
+  @@index([shiftId])
 }
 
 

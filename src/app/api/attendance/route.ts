@@ -82,15 +82,52 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── حساب التأخير بناءً على شيفت الموظف ──
+  let statusFinal = body.status ?? "present";
+  let overtimeMinutes = 0;
+
+  if (body.checkIn && employeeId) {
+    // جلب الشيفت الحالي للموظف
+    const empShift = await prisma.employeeShift.findFirst({
+      where: { employeeId, endDate: null },
+      include: { shift: true },
+    });
+
+    if (empShift?.shift) {
+      const shift = empShift.shift;
+      const checkInDt = new Date(body.checkIn);
+      const [sh, sm] = shift.checkInTime.split(":").map(Number);
+      const shiftInMs = sh * 60 + sm; // دقائق
+      const actualInMs = checkInDt.getHours() * 60 + checkInDt.getMinutes();
+      const lateMins = actualInMs - shiftInMs;
+
+      // جلب مهلة التأخير من الإعدادات (افتراضي 15 دقيقة)
+      const tolSetting = await prisma.setting.findUnique({ where: { key: "lateToleranceMinutes" } });
+      const tolerance = tolSetting ? Number(tolSetting.value) : 15;
+
+      if (lateMins > tolerance) statusFinal = "late";
+
+      // حساب الإضافي إذا أُرسل checkOut
+      if (body.checkOut) {
+        const checkOutDt = new Date(body.checkOut);
+        const [eh, em] = shift.checkOutTime.split(":").map(Number);
+        const shiftOutMs = eh * 60 + em;
+        const actualOutMs = checkOutDt.getHours() * 60 + checkOutDt.getMinutes();
+        overtimeMinutes = Math.max(0, actualOutMs - shiftOutMs);
+      }
+    }
+  }
+
   const record = await prisma.attendance.create({
     data: {
       employeeId: body.employeeId,
       date: new Date(body.date),
       checkIn: body.checkIn ? new Date(body.checkIn) : undefined,
       checkOut: body.checkOut ? new Date(body.checkOut) : undefined,
-      status: body.status ?? "present",
+      status: statusFinal,
       notes: body.notes,
       workHours: body.workHours ? parseFloat(body.workHours) : undefined,
+      overtimeMinutes,
       workLocationId: body.workLocationId || null,
       checkInLocationId: body.checkInLocationId || null,
       checkOutLocationId: body.checkOutLocationId || null,
