@@ -128,6 +128,27 @@ export async function sendCompanyWelcomeEmail(
   });
 }
 
+/** إرسال رمز OTP للسوبر أدمن */
+export async function sendOtpEmail(to: string, code: string): Promise<boolean> {
+  return sendEmail({
+    to,
+    subject: `رمز التحقق MawaridX — ${code}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;direction:rtl;text-align:center;padding:40px 20px;background:#f8fafc">
+        <div style="max-width:400px;margin:0 auto;background:white;border-radius:16px;padding:40px;box-shadow:0 4px 20px rgba(0,0,0,0.08)">
+          <div style="font-size:22px;font-weight:900;color:#0284c7;margin-bottom:8px">MawaridX</div>
+          <div style="font-size:14px;color:#64748b;margin-bottom:32px">رمز التحقق الثنائي</div>
+          <div style="font-size:48px;font-weight:900;letter-spacing:12px;color:#0f172a;background:#f1f5f9;padding:20px;border-radius:12px;margin-bottom:24px">
+            ${code}
+          </div>
+          <p style="color:#64748b;font-size:13px">هذا الرمز صالح لمدة <strong>10 دقائق</strong></p>
+          <p style="color:#94a3b8;font-size:11px;margin-top:16px">إذا لم تطلب هذا الرمز، تجاهل هذا الإيميل</p>
+        </div>
+      </div>
+    `,
+  });
+}
+
 export async function sendNotificationEmail(employeeEmail: string, title: string, message: string) {
   return sendEmail({
     to: employeeEmail,

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { MawaridXLogo, MawaridXWordmark } from "@/components/mawaridx-logo";
-import { Mail, Lock, Eye, EyeOff, AlertCircle, Shield, Sparkles, Users, BarChart3, Fingerprint } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, AlertCircle, Shield, Sparkles, Users, BarChart3, Fingerprint, KeyRound } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +15,12 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
+
+  // ── 2FA ──
+  const [otpStep, setOtpStep] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [userId, setUserId] = useState("");
+  const [maskedEmail, setMaskedEmail] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,14 +36,33 @@ export default function LoginPage() {
     const data = await res.json();
     setLoading(false);
 
-    if (!res.ok) {
-      setError(data.error);
+    if (!res.ok) { setError(data.error); return; }
+
+    // السوبر أدمن يحتاج OTP
+    if (data.require2fa) {
+      setUserId(data.userId);
+      setMaskedEmail(data.maskedEmail);
+      setOtpStep(true);
       return;
     }
 
-    if (data.isSuperAdmin)        router.push("/super-admin");
-    else if (data.role === "employee") router.push("/portal");
-    else                          router.push("/dashboard");
+    if (data.role === "employee") router.push("/portal");
+    else router.push("/dashboard");
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    const res = await fetch("/api/auth/verify-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, code: otpCode }),
+    });
+    const data = await res.json();
+    setLoading(false);
+    if (!res.ok) { setError(data.error); return; }
+    router.push("/super-admin");
   };
 
   return (
@@ -139,6 +164,54 @@ export default function LoginPage() {
 
           {/* البطاقة الفاخرة */}
           <div className="glass-strong rounded-3xl shadow-brand-lg border border-white/50 dark:border-white/10 p-7 sm:p-9">
+
+            {/* ══ خطوة OTP ══ */}
+            {otpStep ? (
+              <>
+                <div className="text-center mb-7">
+                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand-gradient shadow-brand mb-4 animate-float">
+                    <KeyRound className="h-6 w-6 text-white" />
+                  </div>
+                  <h1 className="text-2xl font-black text-brand-ink">التحقق الثنائي</h1>
+                  <p className="text-sm text-brand-muted mt-1">
+                    أُرسل رمز مكوّن من 6 أرقام إلى <span className="font-bold text-brand-ink">{maskedEmail}</span>
+                  </p>
+                </div>
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-brand-ink">رمز التحقق</Label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="000000"
+                      value={otpCode}
+                      onChange={e => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                      required
+                      autoFocus
+                      className="h-14 text-center text-3xl font-black tracking-widest bg-white/60 border-brand-border focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
+                      dir="ltr"
+                    />
+                    <p className="text-[11px] text-brand-muted text-center">الرمز صالح 10 دقائق فقط</p>
+                  </div>
+                  {error && (
+                    <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2.5 rounded-xl">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span>{error}</span>
+                    </div>
+                  )}
+                  <button type="submit" disabled={loading || otpCode.length !== 6}
+                    className="btn-brand w-full h-11 rounded-xl text-sm disabled:opacity-60 flex items-center justify-center gap-2">
+                    {loading ? <><div className="w-4 h-4 border-2 border-white/70 border-t-white rounded-full animate-spin" /> جارٍ التحقق...</> : "تأكيد الرمز"}
+                  </button>
+                  <button type="button" onClick={() => { setOtpStep(false); setOtpCode(""); setError(""); }}
+                    className="w-full text-sm text-brand-muted hover:text-brand-primary transition-colors text-center py-1">
+                    ← العودة لتسجيل الدخول
+                  </button>
+                </form>
+              </>
+            ) : (
+            <>
             {/* رأس النموذج */}
             <div className="text-center mb-7">
               <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand-gradient shadow-brand mb-4 animate-float">
@@ -238,6 +311,8 @@ export default function LoginPage() {
                 </Link>
               </div>
             </form>
+            </>
+            )}
           </div>
 
           {/* ختام تحت البطاقة */}
