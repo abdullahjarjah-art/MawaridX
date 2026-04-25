@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { isValidEmail, isValidPhone, isValidIBAN } from "@/lib/validate";
+import { createEmployeeChecklist } from "@/lib/checklist";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -99,6 +100,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         multiLocation: body.multiLocation === true || body.multiLocation === "true",
       },
     });
+    // إنشاء Offboarding تلقائياً عند إنهاء الخدمة
+    if (body.status === "terminated") {
+      createEmployeeChecklist(id, "offboarding").catch(() => {});
+    }
+
     return NextResponse.json(employee);
   } catch (err) {
     console.error("Update employee error:", err);

@@ -141,9 +141,55 @@ model Employee {
   deductionRules SalaryDeductionRule[]
   disciplinaries Disciplinary[]
   shifts         EmployeeShift[]
+  checklists     EmployeeChecklist[]
 
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+}
+
+// ==============================
+// Onboarding / Offboarding
+// ==============================
+
+model ChecklistTemplate {
+  id        String                  @id @default(cuid())
+  type      String                  // onboarding | offboarding
+  items     ChecklistTemplateItem[]
+  createdAt DateTime                @default(now())
+}
+
+model ChecklistTemplateItem {
+  id         String            @id @default(cuid())
+  templateId String
+  template   ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  title      String
+  assignedTo String            @default("hr") // hr | manager | it | employee
+  order      Int               @default(0)
+}
+
+model EmployeeChecklist {
+  id         String                  @id @default(cuid())
+  employeeId String
+  employee   Employee                @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type       String                  // onboarding | offboarding
+  items      EmployeeChecklistItem[]
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+
+  @@unique([employeeId, type])
+  @@index([employeeId])
+}
+
+model EmployeeChecklistItem {
+  id          String            @id @default(cuid())
+  checklistId String
+  checklist   EmployeeChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  title       String
+  assignedTo  String            @default("hr")
+  order       Int               @default(0)
+  done        Boolean           @default(false)
+  doneAt      DateTime?
+  doneBy      String?
 }
 
 // ==============================
