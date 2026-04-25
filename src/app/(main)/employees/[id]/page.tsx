@@ -14,8 +14,10 @@ import {
   ArrowRight, Briefcase, Users, ClipboardList, CalendarCheck, CreditCard,
   Package, CalendarDays, Plane, Monitor, Plus, Trash2, CheckCircle2, XCircle,
   Clock, FileText, Upload, Eye, Download, File, ImageIcon, AlertTriangle,
-  Camera, RefreshCw, Send, BanIcon,
+  Camera, RefreshCw, Send, BanIcon, ShieldAlert, FileSpreadsheet, BadgeCheck,
+  Scroll,
 } from "lucide-react";
+import { generateSalaryCertificate, generateEmploymentLetter, generateExperienceLetter } from "@/lib/letters-pdf";
 import { EmployeeAvatar } from "@/components/employee-avatar";
 
 const monthNames = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
@@ -49,7 +51,7 @@ type Employee = {
   arabicName?: string; photo?: string | null; email: string; phone?: string; nationalId?: string;
   birthDate?: string; gender?: string; maritalStatus?: string; address?: string; city?: string;
   jobTitle?: string; position: string; department?: string; employmentType: string;
-  startDate: string; endDate?: string; status: string;
+  startDate: string; endDate?: string; status: string; nationality?: string;
   basicSalary: number; bankName?: string; iban?: string;
   multiLocation?: boolean;
   manager?: { id: string; firstName: string; lastName: string } | null;
@@ -123,6 +125,12 @@ export default function EmployeeProfilePage() {
   const [docSaving, setDocSaving] = useState(false);
   const docFileRef = useRef<HTMLInputElement>(null);
 
+  // Disciplinary
+  const [disciplinaries, setDisciplinaries] = useState<{ id: string; type: string; reason: string; date: string; issuedBy: string; status: string; penalty?: number; days?: number }[]>([]);
+  const [discDialog, setDiscDialog] = useState(false);
+  const [discForm, setDiscForm] = useState({ type: "verbal_warning", reason: "", description: "", date: new Date().toISOString().slice(0, 10), penalty: "", days: "" });
+  const [discSaving, setDiscSaving] = useState(false);
+
   // Contract renewal — يجب أن تكون هنا قبل أي return مشروط
   const [renewPopup, setRenewPopup]           = useState(false);
   const [renewing, setRenewing]               = useState(false);
@@ -150,6 +158,7 @@ export default function EmployeeProfilePage() {
     fetch(`/api/employees/${id}?full=1`).then(r => r.json()).then(setEmp).catch(() => {});
     fetch(`/api/employees/${id}/custodies`).then(r => r.json()).then(d => setCustodies(Array.isArray(d) ? d : [])).catch(() => {});
     fetch(`/api/employees/${id}/documents`).then(r => r.json()).then(d => setDocuments(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch(`/api/disciplinary?employeeId=${id}`).then(r => r.json()).then(d => setDisciplinaries(Array.isArray(d) ? d : [])).catch(() => {});
     fetch("/api/locations").then(r => r.json()).then(d => setAllLocations(Array.isArray(d) ? d : (d.data ?? []))).catch(() => {});
     fetch(`/api/employee-locations/${id}`).then(r => r.json()).then(d => setEmpLocations(Array.isArray(d) ? d : [])).catch(() => {});
     loadContractState();
@@ -890,6 +899,218 @@ export default function EmployeeProfilePage() {
       </Dialog>
 
       {/* ── Dialog إضافة عهدة ── */}
+      {/* ═══════════════════════════════════════
+          فترة التجربة + مكافأة نهاية الخدمة
+      ═══════════════════════════════════════ */}
+      {emp && (() => {
+        const startDate = new Date(emp.startDate);
+        const probEnd = (emp as any).probationEndDate ? new Date((emp as any).probationEndDate) : new Date(startDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+        const today = new Date();
+        const probDaysLeft = Math.ceil((probEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        const isOnProbation = probDaysLeft > 0;
+
+        // حساب مكافأة نهاية الخدمة (نظام العمل السعودي)
+        const yearsOfService = (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+        const basicSalary = emp.basicSalary;
+        let eosByResign = 0;
+        let eosByTermination = 0;
+        if (yearsOfService >= 2) {
+          // بالاستقالة
+          const first5 = Math.min(yearsOfService, 5);
+          const beyond5 = Math.max(yearsOfService - 5, 0);
+          const fullAmt = (first5 * basicSalary / 2) + (beyond5 * basicSalary);
+          if (yearsOfService < 5) eosByResign = fullAmt / 3;
+          else if (yearsOfService < 10) eosByResign = fullAmt * 2 / 3;
+          else eosByResign = fullAmt;
+          // بإنهاء العقد من صاحب العمل
+          eosByTermination = (Math.min(yearsOfService, 5) * basicSalary / 2) + (Math.max(yearsOfService - 5, 0) * basicSalary);
+        }
+
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* فترة التجربة */}
+            <div className={`rounded-2xl border p-4 ${isOnProbation ? "border-amber-200 bg-amber-50 dark:bg-amber-950/20" : "border-green-200 bg-green-50 dark:bg-green-950/20"}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <BadgeCheck className={`h-5 w-5 ${isOnProbation ? "text-amber-500" : "text-green-500"}`} />
+                <h3 className="font-semibold text-sm">فترة التجربة</h3>
+              </div>
+              {isOnProbation ? (
+                <>
+                  <p className="text-2xl font-black text-amber-600">{probDaysLeft} يوم</p>
+                  <p className="text-xs text-amber-600/70 mt-1">متبقٍ — تنتهي في {probEnd.toLocaleDateString("ar-SA")}</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-green-700">اجتاز فترة التجربة</p>
+                  <p className="text-xs text-green-600/70 mt-1">انتهت في {probEnd.toLocaleDateString("ar-SA")}</p>
+                </>
+              )}
+              <p className="text-xs text-muted-foreground mt-2">مدة الخدمة: {yearsOfService >= 1 ? `${Math.floor(yearsOfService)} سنة` : `${Math.floor(yearsOfService * 12)} شهر`}</p>
+            </div>
+
+            {/* مكافأة نهاية الخدمة */}
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 dark:bg-sky-950/20 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <DollarSign className="h-5 w-5 text-sky-500" />
+                <h3 className="font-semibold text-sm">مكافأة نهاية الخدمة</h3>
+              </div>
+              {yearsOfService < 2 ? (
+                <p className="text-xs text-muted-foreground">لا يستحق المكافأة (أقل من سنتين)</p>
+              ) : (
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">عند الاستقالة</p>
+                    <p className="text-lg font-black text-sky-700">{Math.round(eosByResign).toLocaleString("ar-SA")} ر.س</p>
+                  </div>
+                  <div className="border-t border-sky-200 pt-2">
+                    <p className="text-xs text-muted-foreground">عند إنهاء العقد من صاحب العمل</p>
+                    <p className="text-lg font-black text-sky-700">{Math.round(eosByTermination).toLocaleString("ar-SA")} ر.س</p>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">بناءً على الراتب الأساسي — {Math.floor(yearsOfService)} سنة خدمة</p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ═══════════════════════════════════════
+          خطابات التعريف
+      ═══════════════════════════════════════ */}
+      {emp && (
+        <div className="rounded-2xl border p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Scroll className="h-5 w-5 text-violet-500" />
+            <h3 className="font-semibold text-sm">خطابات التعريف</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { label: "شهادة راتب", fn: () => generateSalaryCertificate({ employeeName: `${emp.firstName} ${emp.lastName}`, arabicName: (emp as any).arabicName, employeeNumber: emp.employeeNumber, jobTitle: emp.jobTitle, department: emp.department, nationality: emp.nationality, startDate: emp.startDate, basicSalary: emp.basicSalary, housingAllowance: (emp as any).housingAllowance ?? 0, transportAllowance: (emp as any).transportAllowance ?? 0, otherAllowance: (emp as any).otherAllowance ?? 0 }) },
+              { label: "خطاب توظيف", fn: () => generateEmploymentLetter({ employeeName: `${emp.firstName} ${emp.lastName}`, employeeNumber: emp.employeeNumber, jobTitle: emp.jobTitle, department: emp.department, startDate: emp.startDate }) },
+              { label: "شهادة خبرة", fn: () => generateExperienceLetter({ employeeName: `${emp.firstName} ${emp.lastName}`, employeeNumber: emp.employeeNumber, jobTitle: emp.jobTitle, department: emp.department, startDate: emp.startDate, endDate: emp.endDate }) },
+            ].map(({ label, fn }) => (
+              <Button key={label} variant="outline" size="sm" className="gap-1.5" onClick={fn}>
+                <Download className="h-3.5 w-3.5" />
+                {label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════
+          الجزاءات والإنذارات
+      ═══════════════════════════════════════ */}
+      <div className="rounded-2xl border p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5 text-rose-500" />
+            <h3 className="font-semibold text-sm">الجزاءات والإنذارات</h3>
+            {disciplinaries.length > 0 && <span className="bg-rose-100 text-rose-700 text-xs px-2 py-0.5 rounded-full">{disciplinaries.length}</span>}
+          </div>
+          <Button size="sm" variant="outline" className="gap-1 h-8 text-xs" onClick={() => setDiscDialog(true)}>
+            <Plus className="h-3.5 w-3.5" /> إضافة
+          </Button>
+        </div>
+        {disciplinaries.length === 0 ? (
+          <p className="text-xs text-muted-foreground py-2">لا توجد جزاءات مسجّلة</p>
+        ) : (
+          <div className="space-y-2">
+            {disciplinaries.map(d => {
+              const typeLabels: Record<string, { label: string; color: string }> = {
+                verbal_warning:  { label: "إنذار شفهي",   color: "bg-amber-100 text-amber-700" },
+                written_warning: { label: "إنذار كتابي",  color: "bg-orange-100 text-orange-700" },
+                final_warning:   { label: "إنذار نهائي",  color: "bg-red-100 text-red-700" },
+                suspension:      { label: "وقف عن العمل", color: "bg-slate-100 text-slate-700" },
+                deduction:       { label: "خصم مالي",     color: "bg-rose-100 text-rose-700" },
+              };
+              const t_ = typeLabels[d.type] ?? { label: d.type, color: "bg-gray-100 text-gray-700" };
+              return (
+                <div key={d.id} className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 border">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${t_.color}`}>{t_.label}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{d.reason}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(d.date).toLocaleDateString("ar-SA")} · {d.issuedBy}</p>
+                    {d.penalty && <p className="text-xs text-rose-600">خصم: {d.penalty} ر.س</p>}
+                    {d.days && <p className="text-xs text-slate-600">أيام الوقف: {d.days}</p>}
+                  </div>
+                  {d.status === "active" && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500 hover:bg-rose-50 shrink-0"
+                      onClick={async () => { await fetch(`/api/disciplinary/${d.id}`, { method: "DELETE" }); fetch(`/api/disciplinary?employeeId=${id}`).then(r => r.json()).then(x => setDisciplinaries(Array.isArray(x) ? x : [])); }}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Disciplinary Dialog ── */}
+      <Dialog open={discDialog} onOpenChange={setDiscDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-rose-500" />
+              إضافة جزاء / إنذار
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-sm font-medium mb-1 block">النوع</label>
+              <Select value={discForm.type} onValueChange={v => { if (v) setDiscForm(f => ({ ...f, type: v })); }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="verbal_warning">إنذار شفهي</SelectItem>
+                  <SelectItem value="written_warning">إنذار كتابي</SelectItem>
+                  <SelectItem value="final_warning">إنذار نهائي</SelectItem>
+                  <SelectItem value="suspension">وقف عن العمل</SelectItem>
+                  <SelectItem value="deduction">خصم مالي</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">السبب *</label>
+              <Input value={discForm.reason} onChange={e => setDiscForm(f => ({ ...f, reason: e.target.value }))} placeholder="سبب الجزاء" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">التفاصيل</label>
+              <Input value={discForm.description} onChange={e => setDiscForm(f => ({ ...f, description: e.target.value }))} placeholder="تفاصيل إضافية (اختياري)" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">التاريخ</label>
+              <Input type="date" value={discForm.date} onChange={e => setDiscForm(f => ({ ...f, date: e.target.value }))} />
+            </div>
+            {discForm.type === "deduction" && (
+              <div>
+                <label className="text-sm font-medium mb-1 block">مبلغ الخصم (ر.س)</label>
+                <Input type="number" min="0" value={discForm.penalty} onChange={e => setDiscForm(f => ({ ...f, penalty: e.target.value }))} />
+              </div>
+            )}
+            {discForm.type === "suspension" && (
+              <div>
+                <label className="text-sm font-medium mb-1 block">عدد الأيام</label>
+                <Input type="number" min="1" value={discForm.days} onChange={e => setDiscForm(f => ({ ...f, days: e.target.value }))} />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDiscDialog(false)}>إلغاء</Button>
+            <Button disabled={discSaving || !discForm.reason} onClick={async () => {
+              setDiscSaving(true);
+              await fetch("/api/disciplinary", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employeeId: id, ...discForm }) });
+              setDiscDialog(false);
+              setDiscForm({ type: "verbal_warning", reason: "", description: "", date: new Date().toISOString().slice(0, 10), penalty: "", days: "" });
+              fetch(`/api/disciplinary?employeeId=${id}`).then(r => r.json()).then(x => setDisciplinaries(Array.isArray(x) ? x : []));
+              setDiscSaving(false);
+            }}>
+              {discSaving ? "جاري الحفظ..." : "حفظ"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={custodyDialog} onOpenChange={setCustodyDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>إضافة عهدة للموظف</DialogTitle></DialogHeader>

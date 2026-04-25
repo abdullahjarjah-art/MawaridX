@@ -16,7 +16,7 @@ import {
   Users, ChevronDown, ChevronUp, XCircle,
 } from "lucide-react";
 import { generateSalaryPDF } from "@/lib/salary-pdf";
-import { exportSalariesExcel, exportSalariesPDF } from "@/lib/export-utils";
+import { exportSalariesExcel, exportSalariesPDF, exportWPS } from "@/lib/export-utils";
 import { Pagination } from "@/components/ui/pagination";
 import { useLang } from "@/components/lang-provider";
 
@@ -33,7 +33,7 @@ type Salary = {
   gosiEmployee: number; gosiEmployer: number;
   netSalary: number;
   status: string; paidAt?: string; notes?: string;
-  employee: { firstName: string; lastName: string; employeeNumber: string; department?: string };
+  employee: { firstName: string; lastName: string; employeeNumber: string; department?: string; iban?: string; nationality?: string };
 };
 type Attendance = { id: string; employeeId: string; date: string; status: string; checkIn?: string; };
 type Row = { employee: Employee; salary: Salary | null; lateMins: number; };
@@ -366,6 +366,25 @@ export default function SalariesPage() {
                   Number(month), Number(year)
                 )}>
                 <FileSpreadsheet className="h-4 w-4 text-green-600" /> Excel
+              </Button>
+              <Button variant="outline" className="gap-1.5 h-9 text-sm"
+                onClick={() => exportWPS(
+                  salaries.filter(s => s.employee.iban).map(s => ({
+                    employeeNumber: s.employee.employeeNumber,
+                    employeeName: `${s.employee.firstName} ${s.employee.lastName}`,
+                    iban: s.employee.iban ?? "",
+                    bankCode: (s.employee.iban ?? "").replace(/\s/g, "").slice(4, 8),
+                    basicSalary: s.basicSalary,
+                    allowances: s.allowances,
+                    deductions: s.deductions + (s.gosiEmployee ?? 0),
+                    netSalary: s.netSalary,
+                    month: s.month,
+                    year: s.year,
+                  })),
+                  "employer-ref",
+                  Number(month), Number(year)
+                )}>
+                <FileSpreadsheet className="h-4 w-4 text-blue-600" /> WPS
               </Button>
             </>
           )}

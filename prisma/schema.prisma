@@ -127,6 +127,8 @@ model Employee {
   userId         String?   @unique
   user           User?     @relation(fields: [userId], references: [id])
 
+  probationEndDate DateTime?  // نهاية فترة التجربة
+
   attendances    Attendance[]
   leaves         Leave[]
   salaries       Salary[]
@@ -137,9 +139,50 @@ model Employee {
   leaveBalances  LeaveBalance[]
   custodies      Custody[]
   deductionRules SalaryDeductionRule[]
+  disciplinaries Disciplinary[]
 
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+}
+
+
+// ==============================
+// الجزاءات والإنذارات
+// ==============================
+
+model Disciplinary {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type        String    // verbal_warning, written_warning, final_warning, suspension, deduction
+  reason      String
+  description String?
+  date        DateTime
+  issuedBy    String
+  penalty     Float?    // مبلغ الخصم المالي
+  days        Int?      // أيام الوقف عن العمل
+  status      String    @default("active") // active, cancelled
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([employeeId])
+}
+
+
+// ==============================
+// العطل الرسمية
+// ==============================
+
+model Holiday {
+  id        String   @id @default(cuid())
+  name      String
+  date      DateTime
+  type      String   @default("official") // official, religious, national
+  year      Int
+  createdAt DateTime @default(now())
+
+  @@index([year])
 }
 
 // ==============================

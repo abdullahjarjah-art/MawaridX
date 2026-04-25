@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, Save, Clock, Timer, Mail, Send, ArrowLeft, CalendarCheck, RefreshCw, ChevronDown, ChevronUp, AlertCircle, CheckCircle2 } from "lucide-react";
+import { MapPin, Save, Clock, Timer, Mail, Send, ArrowLeft, CalendarCheck, RefreshCw, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, Users, User } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
 import { useLang } from "@/components/lang-provider";
@@ -47,12 +47,31 @@ export default function SettingsPage() {
   const [showCarryDetails, setShowCarryDetails] = useState(false);
   const [carryPreview, setCarryPreview] = useState<{ name: string; remainAnnual: number; remainSick: number; remainEmergency: number }[] | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  // وضع الترحيل: للجميع أو موظف محدد
+  const [carryMode, setCarryMode] = useState<"all" | "single">("all");
+  const [carryEmpSearch, setCarryEmpSearch] = useState("");
+  const [carryEmpId, setCarryEmpId] = useState("");
+  const [carryEmpList, setCarryEmpList] = useState<{ id: string; firstName: string; lastName: string; employeeNumber: string }[]>([]);
+  const [carryEmpDropdown, setCarryEmpDropdown] = useState(false);
+
+  useEffect(() => {
+    if (carryMode === "single" && carryEmpSearch.length >= 2) {
+      fetch(`/api/employees?all=1&search=${encodeURIComponent(carryEmpSearch)}`)
+        .then(r => r.json())
+        .then(d => setCarryEmpList(Array.isArray(d) ? d : (d.data ?? [])));
+      setCarryEmpDropdown(true);
+    } else {
+      setCarryEmpDropdown(false);
+    }
+  }, [carryEmpSearch, carryMode]);
 
   const previewCarryover = async () => {
     setPreviewLoading(true);
     setCarryPreview(null);
     try {
-      const res = await fetch(`/api/leave-balance/carryover?fromYear=${carryFromYear}`);
+      const params = new URLSearchParams({ fromYear: carryFromYear });
+      if (carryMode === "single" && carryEmpId) params.set("employeeId", carryEmpId);
+      const res = await fetch(`/api/leave-balance/carryover?${params}`);
       const data = await res.json();
       setCarryPreview(data.employees ?? []);
     } catch { setCarryPreview(null); }
@@ -60,20 +79,23 @@ export default function SettingsPage() {
   };
 
   const executeCarryover = async () => {
+    if (carryMode === "single" && !carryEmpId) return;
     setCarryLoading(true);
     setCarryResult(null);
     setCarryError(null);
     try {
+      const body: Record<string, unknown> = {
+        fromYear: Number(carryFromYear),
+        toYear: Number(carryToYear),
+        maxCarryAnnual: Number(maxCarryAnnual),
+        maxCarrySick: Number(maxCarrySick),
+        maxCarryEmergency: Number(maxCarryEmergency),
+      };
+      if (carryMode === "single" && carryEmpId) body.employeeId = carryEmpId;
       const res = await fetch("/api/leave-balance/carryover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fromYear: Number(carryFromYear),
-          toYear: Number(carryToYear),
-          maxCarryAnnual: Number(maxCarryAnnual),
-          maxCarrySick: Number(maxCarrySick),
-          maxCarryEmergency: Number(maxCarryEmergency),
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) { setCarryError(data.error ?? t("حدث خطأ")); }
@@ -276,7 +298,55 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-500 mb-4">{t("نقل الرصيد المتبقي من السنة السابقة إلى السنة الجديدة لجميع الموظفين النشطين")}</p>
+          <p className="text-sm text-gray-500 mb-4">{t("نقل الرصيد المتبقي من السنة السابقة إلى السنة الجديدة")}</p>
+
+          {/* toggle: للجميع / موظف محدد */}
+          <div className="inline-flex rounded-lg border border-gray-200 p-1 mb-4 bg-gray-50">
+            <button
+              onClick={() => { setCarryMode("all"); setCarryEmpId(""); setCarryEmpSearch(""); setCarryPreview(null); setCarryResult(null); }}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${carryMode === "all" ? "bg-white shadow text-brand-primary" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              <Users className="h-3.5 w-3.5" />
+              {t("جميع الموظفين")}
+            </button>
+            <button
+              onClick={() => { setCarryMode("single"); setCarryPreview(null); setCarryResult(null); }}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${carryMode === "single" ? "bg-white shadow text-brand-primary" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              <User className="h-3.5 w-3.5" />
+              {t("موظف محدد")}
+            </button>
+          </div>
+
+          {/* بحث موظف */}
+          {carryMode === "single" && (
+            <div className="relative mb-4">
+              <Label className="mb-1 block text-sm">{t("ابحث عن موظف")}</Label>
+              <Input
+                value={carryEmpSearch}
+                onChange={e => { setCarryEmpSearch(e.target.value); if (!e.target.value) { setCarryEmpId(""); } }}
+                placeholder={t("اسم الموظف أو رقمه...")}
+                className="max-w-sm"
+              />
+              {carryEmpId && (
+                <p className="text-xs text-green-600 mt-1">✓ {carryEmpSearch}</p>
+              )}
+              {carryEmpDropdown && carryEmpList.length > 0 && (
+                <div className="absolute z-10 top-full mt-1 w-full max-w-sm bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                  {carryEmpList.slice(0, 8).map(emp => (
+                    <button
+                      key={emp.id}
+                      className="w-full text-right px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center justify-between"
+                      onClick={() => { setCarryEmpId(emp.id); setCarryEmpSearch(`${emp.firstName} ${emp.lastName}`); setCarryEmpDropdown(false); }}
+                    >
+                      <span className="font-medium">{emp.firstName} {emp.lastName}</span>
+                      <span className="text-gray-400 text-xs">{emp.employeeNumber}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
             <div className="space-y-1">

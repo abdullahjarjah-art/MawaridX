@@ -42,6 +42,7 @@ const navItems = [
   { href: "/locations", label: "مواقع العمل", icon: MapPin },
   { href: "/attendance", label: "الحضور والإجازات", icon: CalendarCheck },
   { href: "/calendar", label: "التقويم", icon: CalendarDays },
+  { href: "/holidays", label: "العطل الرسمية", icon: CalendarCheck },
   { href: "/requests", label: "الطلبات", icon: ClipboardList },
   { href: "/announcements", label: "الإعلانات", icon: Megaphone },
   { href: "/reports", label: "التقارير", icon: BarChart3 },

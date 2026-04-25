@@ -6,6 +6,72 @@ import * as XLSX from "xlsx";
    Shared Export Utilities — PDF & Excel
    ───────────────────────────────────────── */
 
+/** WPS — ملف حماية الأجور بصيغة SIF */
+export type WpsRow = {
+  employeeNumber: string;
+  employeeName: string;
+  iban: string;
+  bankCode: string;
+  basicSalary: number;
+  allowances: number;
+  deductions: number;
+  netSalary: number;
+  month: number;
+  year: number;
+};
+
+export function exportWPS(rows: WpsRow[], employerRef: string, month: number, year: number) {
+  const periodStart = `${year}-${String(month).padStart(2, "0")}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const periodEnd = `${year}-${String(month).padStart(2, "0")}-${lastDay}`;
+  const payDate = periodEnd;
+
+  // SIF Header
+  const header = [["EHR", employerRef, rows.length, periodStart, periodEnd, "SAR"]];
+  // SIF Rows
+  const detail = rows.map((r, i) => [
+    "EDR",
+    employerRef,
+    r.employeeNumber,
+    i + 1,
+    r.iban.replace(/\s/g, ""),
+    r.bankCode,
+    r.netSalary.toFixed(2),
+    "682", // SAR currency code
+    payDate,
+    periodStart,
+    periodEnd,
+    r.basicSalary.toFixed(2),
+    r.allowances.toFixed(2),
+    r.deductions.toFixed(2),
+  ]);
+  // SIF Footer
+  const footer = [["EFR", employerRef, rows.length, rows.reduce((s, r) => s + r.netSalary, 0).toFixed(2)]];
+
+  // Sheet 1: SIF format (للرفع على النظام)
+  const sifData = [...header, ...detail, ...footer];
+  const wsSIF = XLSX.utils.aoa_to_sheet(sifData);
+
+  // Sheet 2: قراءة بشرية (للمراجعة)
+  const readable = rows.map(r => ({
+    "رقم الموظف": r.employeeNumber,
+    "اسم الموظف": r.employeeName,
+    "IBAN": r.iban,
+    "رمز البنك": r.bankCode,
+    "الراتب الأساسي": r.basicSalary,
+    "البدلات": r.allowances,
+    "الاستقطاعات": r.deductions,
+    "صافي الراتب": r.netSalary,
+  }));
+  const wsReadable = XLSX.utils.json_to_sheet(readable);
+  wsReadable["!cols"] = Object.keys(readable[0] ?? {}).map(() => ({ wch: 20 }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsSIF, "SIF");
+  XLSX.utils.book_append_sheet(wb, wsReadable, "مراجعة");
+  XLSX.writeFile(wb, `WPS_${year}_${String(month).padStart(2, "0")}.xlsx`);
+}
+
 const monthNames = [
   "يناير","فبراير","مارس","أبريل","مايو","يونيو",
   "يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر",
@@ -14,6 +80,29 @@ const monthNames = [
 /* ═══════════════════════════════════════
    EXCEL EXPORT
    ═══════════════════════════════════════ */
+
+/** Download blank template for bulk employee import */
+export function downloadEmployeeImportTemplate() {
+  const headers = [
+    "الاسم الأول", "الاسم الأخير", "الاسم بالعربي", "البريد الإلكتروني",
+    "الجوال", "رقم الهوية", "تاريخ الميلاد", "الجنس", "الحالة الاجتماعية",
+    "المدينة", "المسمى الوظيفي", "الدور", "القسم", "نوع التوظيف",
+    "تاريخ الالتحاق", "الراتب الأساسي", "بدل سكن", "بدل نقل",
+    "بدلات أخرى", "البنك", "IBAN", "الجنسية", "تاريخ انتهاء الإقامة",
+  ];
+  const example = [
+    "أحمد", "الزهراني", "أحمد علي الزهراني", "ahmed@company.com",
+    "0501234567", "1234567890", "1990-05-15", "ذكر", "أعزب",
+    "الرياض", "محاسب", "employee", "المحاسبة", "full_time",
+    "2024-01-01", "8000", "2000", "1000",
+    "0", "البنك الأهلي", "SA0380000000608010167519", "saudi", "",
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([headers, example]);
+  ws["!cols"] = headers.map(() => ({ wch: 22 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "موظفون");
+  XLSX.writeFile(wb, "نموذج_استيراد_الموظفين.xlsx");
+}
 
 /** Generic: export array of objects as .xlsx */
 export function exportToExcel(data: Record<string, unknown>[], fileName: string, sheetName = "Sheet1") {

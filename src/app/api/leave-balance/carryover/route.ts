@@ -14,17 +14,17 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const fromYear = Number(body.fromYear);
   const toYear = Number(body.toYear);
-  const maxCarryAnnual = body.maxCarryAnnual !== undefined ? Number(body.maxCarryAnnual) : 15; // أقصى ترحيل سنوي
-  const maxCarrySick = body.maxCarrySick !== undefined ? Number(body.maxCarrySick) : 0;        // لا ترحيل مرضي
-  const maxCarryEmergency = body.maxCarryEmergency !== undefined ? Number(body.maxCarryEmergency) : 0; // لا ترحيل طارئ
+  const maxCarryAnnual = body.maxCarryAnnual !== undefined ? Number(body.maxCarryAnnual) : 15;
+  const maxCarrySick = body.maxCarrySick !== undefined ? Number(body.maxCarrySick) : 0;
+  const maxCarryEmergency = body.maxCarryEmergency !== undefined ? Number(body.maxCarryEmergency) : 0;
+  const employeeId: string | undefined = body.employeeId || undefined; // موظف محدد أو الكل
 
   if (!fromYear || !toYear || toYear <= fromYear) {
     return NextResponse.json({ error: "السنوات غير صحيحة" }, { status: 400 });
   }
 
-  // جلب جميع الموظفين النشطين
   const employees = await prisma.employee.findMany({
-    where: { status: "active" },
+    where: employeeId ? { id: employeeId } : { status: "active" },
     select: { id: true, firstName: true, lastName: true },
   });
 
@@ -125,9 +125,10 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const fromYear = Number(searchParams.get("fromYear") || new Date().getFullYear() - 1);
+  const empId = searchParams.get("employeeId") || undefined;
 
   const employees = await prisma.employee.findMany({
-    where: { status: "active" },
+    where: empId ? { id: empId } : { status: "active" },
     select: { id: true, firstName: true, lastName: true },
   });
 

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { isValidEmail, isValidPhone, isValidIBAN } from "@/lib/validate";
+import { sendEmployeeInviteEmail } from "@/lib/email";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -104,6 +106,19 @@ export async function POST(req: NextRequest) {
 
   const nullIfEmpty = (v: string | undefined) => (v && v.trim() !== "" ? v : null);
 
+  // إنشاء حساب مستخدم مع token دعوة (48 ساعة)
+  const resetToken = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+  const tempHash = await bcrypt.hash(crypto.randomUUID(), 10);
+  const user = await prisma.user.create({
+    data: {
+      email: email.trim(),
+      password: tempHash,
+      role: "employee",
+      resetToken,
+      resetTokenExpiry: new Date(Date.now() + 48 * 60 * 60 * 1000),
+    },
+  });
+
   // إذا موظف عادي وعنده قسم بدون مدير محدد، نجلب مدير القسم تلقائياً
   let resolvedManagerId = nullIfEmpty(managerId);
   if ((position === "employee" || !position) && !resolvedManagerId && department) {
@@ -143,8 +158,12 @@ export async function POST(req: NextRequest) {
       nationality: nationality ?? "saudi",
       iqamaExpiry: iqamaExpiry ? new Date(iqamaExpiry) : null,
       workLocationId: nullIfEmpty(workLocationId),
+      userId: user.id,
     },
   });
+
+  // إرسال إيميل الدعوة (لا يوقف الإنشاء لو فشل)
+  sendEmployeeInviteEmail(email, firstName, resetToken).catch(() => {});
 
   return NextResponse.json(employee, { status: 201 });
   } catch (err) {

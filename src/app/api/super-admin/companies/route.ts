@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireSuperAdmin } from "@/lib/super-admin";
+import { sendCompanyWelcomeEmail } from "@/lib/email";
 
 // GET /api/super-admin/companies - جلب كل الشركات
 export async function GET() {
@@ -89,6 +90,14 @@ export async function POST(req: NextRequest) {
         role: "admin",
       },
     });
+
+    // إرسال إيميل ترحيب للأدمن (لا نوقف الإنشاء لو فشل الإيميل)
+    sendCompanyWelcomeEmail(
+      adminEmail.toLowerCase(),
+      adminName || "مدير النظام",
+      name,
+      adminPassword,
+    ).catch(() => {});
 
     return NextResponse.json({ success: true, company });
   } catch (err) {
