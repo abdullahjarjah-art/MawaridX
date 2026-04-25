@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit, rateLimitResponse, getIP, LIMITS } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  // ── Rate limiting: 3 طلبات / ساعة لكل IP ──
+  const ip = getIP(req);
+  const rl = checkRateLimit(`forgot:${ip}`, LIMITS.forgotPassword);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
   try {
     const { email } = await req.json();
 

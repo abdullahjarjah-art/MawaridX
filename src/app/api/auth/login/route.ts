@@ -3,8 +3,14 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signToken, setSessionCookie } from "@/lib/auth";
 import { isSuperAdminEmail } from "@/lib/super-admin";
+import { checkRateLimit, rateLimitResponse, getIP, LIMITS } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  // ── Rate limiting: 5 محاولات / 15 دق لكل IP ──
+  const ip = getIP(req);
+  const rl = checkRateLimit(`login:${ip}`, LIMITS.login);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
+
   try {
     const { email, password } = await req.json();
 
