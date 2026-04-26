@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { isValidEmail, isValidPhone, isValidIBAN } from "@/lib/validate";
 import { sendEmployeeInviteEmail } from "@/lib/email";
-import { createEmployeeChecklist } from "@/lib/checklist";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -165,9 +164,6 @@ export async function POST(req: NextRequest) {
 
   // إرسال إيميل الدعوة (لا يوقف الإنشاء لو فشل)
   sendEmployeeInviteEmail(email, firstName, resetToken).catch(() => {});
-
-  // إنشاء قائمة Onboarding تلقائياً
-  createEmployeeChecklist(employee.id, "onboarding").catch(() => {});
 
   return NextResponse.json(employee, { status: 201 });
   } catch (err) {
