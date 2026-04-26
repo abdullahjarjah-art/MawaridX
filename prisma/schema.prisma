@@ -141,45 +141,9 @@ model Employee {
   deductionRules SalaryDeductionRule[]
   disciplinaries Disciplinary[]
   shifts         EmployeeShift[]
-  objectives     Objective[]
 
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
-}
-
-// ==============================
-// OKRs / KPIs — الأهداف ومؤشرات الأداء
-// ==============================
-
-model Objective {
-  id          String      @id @default(cuid())
-  employeeId  String?     // null = هدف على مستوى الشركة
-  employee    Employee?   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
-  period      String      // "2026-Q1" | "2026-Q2" | "2026-H1" | "2026"
-  status      String      @default("active") // active | completed | cancelled
-  keyResults  KeyResult[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-
-  @@index([employeeId])
-  @@index([period])
-}
-
-model KeyResult {
-  id           String    @id @default(cuid())
-  objectiveId  String
-  objective    Objective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
-  title        String
-  unit         String?   // %, ر.س, نقطة, count, ...
-  startValue   Float     @default(0)
-  targetValue  Float
-  currentValue Float     @default(0)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  @@index([objectiveId])
 }
 
 // ==============================
