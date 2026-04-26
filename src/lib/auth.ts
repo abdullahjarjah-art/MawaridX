@@ -1,8 +1,24 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-const SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? "hr-system-secret-key-2024");
+// ── JWT secret: must be set in production ──
+// Dev fallback exists only to make local development easier.
+// In production, this MUST come from the environment or the
+// app refuses to sign / verify tokens.
+const RAW_SECRET = process.env.JWT_SECRET;
+if (process.env.NODE_ENV === "production" && (!RAW_SECRET || RAW_SECRET.length < 32)) {
+  throw new Error(
+    "[security] JWT_SECRET must be set to a strong value (≥32 chars) in production. " +
+      "Generate with: openssl rand -base64 64"
+  );
+}
+const SECRET = new TextEncoder().encode(RAW_SECRET || "dev-only-secret-do-not-use-in-prod");
 const COOKIE = "hr_token";
+
+// ── Session lifetime ──
+// 24h is a security/convenience compromise. Users re-authenticate daily,
+// limiting damage from a stolen cookie. Bump if the team complains.
+const SESSION_HOURS = 24;
 
 export type JWTPayload = {
   userId: string;
@@ -14,7 +30,8 @@ export type JWTPayload = {
 export async function signToken(payload: JWTPayload) {
   return new SignJWT(payload as Record<string, unknown>)
     .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("7d")
+    .setIssuedAt()
+    .setExpirationTime(`${SESSION_HOURS}h`)
     .sign(SECRET);
 }
 
@@ -39,8 +56,8 @@ export async function setSessionCookie(token: string) {
   cookieStore.set(COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 7,
+    sameSite: "strict", // tighter than "lax" — blocks cross-site cookie leakage
+    maxAge: SESSION_HOURS * 60 * 60,
     path: "/",
   });
 }

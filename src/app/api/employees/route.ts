@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
 
   // إنشاء حساب مستخدم مع token دعوة (48 ساعة)
   const resetToken = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
-  const tempHash = await bcrypt.hash(crypto.randomUUID(), 10);
+  const tempHash = await bcrypt.hash(crypto.randomUUID(), 12);
   const user = await prisma.user.create({
     data: {
       email: email.trim(),

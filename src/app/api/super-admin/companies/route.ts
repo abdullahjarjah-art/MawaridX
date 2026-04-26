@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     });
 
     // إنشاء حساب الأدمن للشركة
-    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    const hashedPassword = await bcrypt.hash(adminPassword, 12);
     await prisma.user.create({
       data: {
         email: adminEmail.toLowerCase(),

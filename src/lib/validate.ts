@@ -24,6 +24,15 @@ export function isValidNationalId(id: string): boolean {
   return /^\d{10}$/.test(cleaned);
 }
 
+/** قوة كلمة المرور — الحد الأدنى 8 أحرف، حرف ورقم */
+export function validatePassword(password: string): string | null {
+  if (!password || password.length < 8) return "كلمة المرور يجب أن تكون 8 أحرف على الأقل";
+  if (!/[a-zA-Z؀-ۿ]/.test(password)) return "كلمة المرور يجب أن تحتوي على حرف واحد على الأقل";
+  if (!/\d/.test(password)) return "كلمة المرور يجب أن تحتوي على رقم واحد على الأقل";
+  if (password.length > 128) return "كلمة المرور طويلة جداً (الحد الأقصى 128 حرف)";
+  return null;
+}
+
 /** جمع أخطاء التحقق وإرجاعها */
 export function collectErrors(checks: Array<[boolean, string, string]>): ValidationError[] {
   return checks

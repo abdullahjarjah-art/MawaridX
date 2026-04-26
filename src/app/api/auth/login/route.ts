@@ -7,8 +7,22 @@ import { checkRateLimit, rateLimitResponse, getIP, LIMITS } from "@/lib/rate-lim
 import { createOtp } from "@/lib/otp";
 import { sendOtpEmail } from "@/lib/email";
 
+// ── Account lockout policy ──
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_MINUTES = 15;
+
+async function logAudit(userId: string | null, userName: string | null, action: string, details?: string) {
+  try {
+    await prisma.auditLog.create({
+      data: { userId, userName, action, entity: "auth", details },
+    });
+  } catch {
+    /* never let audit failures break auth */
+  }
+}
+
 export async function POST(req: NextRequest) {
-  // ── Rate limiting: 5 محاولات / 15 دق لكل IP ──
+  // ── IP-based rate limit (independent of email) ──
   const ip = getIP(req);
   const rl = checkRateLimit(`login:${ip}`, LIMITS.login);
   if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs);
@@ -21,21 +35,59 @@ export async function POST(req: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: email.trim().toLowerCase() },
       include: { employee: true },
     });
 
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+    // ── Constant-time-ish: always run bcrypt to avoid leaking user existence ──
+    const passwordOk = user ? await bcrypt.compare(password, user.password) : false;
+
+    if (!user) {
+      await logAudit(null, email, "login_failed", "user not found");
       return NextResponse.json({ error: "البريد الإلكتروني أو كلمة المرور غير صحيحة" }, { status: 401 });
     }
 
-    // ── 2FA: السوبر أدمن يستلم OTP على إيميله ──
+    // ── Account-level lockout check ──
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      const minutes = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000);
+      await logAudit(user.id, user.email, "login_blocked", `account locked, ${minutes}min remaining`);
+      return NextResponse.json(
+        { error: `الحساب مقفل مؤقتاً بسبب محاولات فاشلة متكررة. حاول بعد ${minutes} دقيقة` },
+        { status: 423 }
+      );
+    }
+
+    // ── Wrong password: increment counter, lock if threshold reached ──
+    if (!passwordOk) {
+      const newCount = user.failedLoginAttempts + 1;
+      const data: Record<string, unknown> = { failedLoginAttempts: newCount };
+      if (newCount >= MAX_FAILED_ATTEMPTS) {
+        data.lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60_000);
+        data.failedLoginAttempts = 0;
+      }
+      await prisma.user.update({ where: { id: user.id }, data });
+      await logAudit(user.id, user.email, "login_failed", `attempt ${newCount}/${MAX_FAILED_ATTEMPTS}`);
+      return NextResponse.json({ error: "البريد الإلكتروني أو كلمة المرور غير صحيحة" }, { status: 401 });
+    }
+
+    // ── Successful password — reset counter, record login metadata ──
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        lastLoginAt: new Date(),
+        lastLoginIp: ip,
+      },
+    });
+
+    // ── 2FA: Super admin gets OTP via email ──
     if (isSuperAdminEmail(user.email)) {
       const { code } = createOtp(user.id, user.email, user.role, user.employee?.id);
-      sendOtpEmail(user.email, code).catch(() => {}); // non-blocking
-      // إخفاء الإيميل جزئياً: ab***@gmail.com
+      sendOtpEmail(user.email, code).catch(() => {});
       const [local, domain] = user.email.split("@");
       const maskedEmail = `${local.slice(0, 2)}***@${domain}`;
+      await logAudit(user.id, user.email, "login_otp_sent", `from ip=${ip}`);
       return NextResponse.json({ require2fa: true, userId: user.id, maskedEmail });
     }
 
@@ -47,6 +99,7 @@ export async function POST(req: NextRequest) {
     });
 
     await setSessionCookie(token);
+    await logAudit(user.id, user.email, "login_success", `from ip=${ip}`);
 
     return NextResponse.json({
       id: user.id,
