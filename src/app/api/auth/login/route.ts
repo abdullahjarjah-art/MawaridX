@@ -5,7 +5,7 @@ import { signToken, setSessionCookie } from "@/lib/auth";
 import { isSuperAdminEmail } from "@/lib/super-admin";
 import { checkRateLimit, rateLimitResponse, getIP, LIMITS } from "@/lib/rate-limit";
 import { createOtp } from "@/lib/otp";
-import { sendOtpEmail } from "@/lib/email";
+import { sendOtpEmail, sendAccountLockedEmail } from "@/lib/email";
 
 // ── Account lockout policy ──
 const MAX_FAILED_ATTEMPTS = 5;
@@ -61,12 +61,15 @@ export async function POST(req: NextRequest) {
     if (!passwordOk) {
       const newCount = user.failedLoginAttempts + 1;
       const data: Record<string, unknown> = { failedLoginAttempts: newCount };
-      if (newCount >= MAX_FAILED_ATTEMPTS) {
+      const willLock = newCount >= MAX_FAILED_ATTEMPTS;
+      if (willLock) {
         data.lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60_000);
         data.failedLoginAttempts = 0;
       }
       await prisma.user.update({ where: { id: user.id }, data });
-      await logAudit(user.id, user.email, "login_failed", `attempt ${newCount}/${MAX_FAILED_ATTEMPTS}`);
+      await logAudit(user.id, user.email, willLock ? "account_locked" : "login_failed", `attempt ${newCount}/${MAX_FAILED_ATTEMPTS}, ip=${ip}`);
+      // Notify the user via email when their account gets locked (non-blocking)
+      if (willLock) sendAccountLockedEmail(user.email, ip, LOCKOUT_MINUTES).catch(() => {});
       return NextResponse.json({ error: "البريد الإلكتروني أو كلمة المرور غير صحيحة" }, { status: 401 });
     }
 

@@ -149,6 +149,49 @@ export async function sendOtpEmail(to: string, code: string): Promise<boolean> {
   });
 }
 
+/** Notify user that their account was locked due to failed attempts */
+export async function sendAccountLockedEmail(to: string, ip: string, minutes: number): Promise<boolean> {
+  return sendEmail({
+    to,
+    subject: "🔒 تنبيه أمني — تم قفل حسابك مؤقتاً",
+    html: `
+      <div style="font-family:Arial,sans-serif;direction:rtl;padding:40px 20px;background:#f8fafc">
+        <div style="max-width:520px;margin:0 auto;background:white;border-radius:16px;padding:36px;box-shadow:0 4px 20px rgba(0,0,0,0.08)">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+            <div style="width:48px;height:48px;border-radius:12px;background:#fee2e2;display:flex;align-items:center;justify-content:center;font-size:24px">⚠️</div>
+            <div>
+              <div style="font-size:18px;font-weight:900;color:#dc2626">تنبيه أمني</div>
+              <div style="font-size:12px;color:#64748b">MawaridX</div>
+            </div>
+          </div>
+
+          <h2 style="font-size:20px;font-weight:800;color:#0f172a;margin:0 0 16px">تم قفل حسابك مؤقتاً</h2>
+
+          <p style="color:#475569;font-size:14px;line-height:1.7;margin:0 0 16px">
+            لاحظنا <strong>5 محاولات دخول فاشلة</strong> على حسابك خلال فترة قصيرة. لحمايتك، تم قفل الحساب لمدة <strong>${minutes} دقيقة</strong>.
+          </p>
+
+          <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:14px;margin-bottom:20px">
+            <div style="font-size:12px;color:#7f1d1d;font-weight:700;margin-bottom:4px">عنوان IP المحاول</div>
+            <div style="font-family:monospace;color:#991b1b;font-size:13px">${ip}</div>
+          </div>
+
+          <p style="color:#475569;font-size:13px;line-height:1.6">
+            <strong>إذا كان هذا أنت:</strong> انتظر ${minutes} دقيقة وحاول مجدداً. إذا نسيت كلمة المرور، استخدم خيار "نسيت كلمة المرور".
+          </p>
+          <p style="color:#475569;font-size:13px;line-height:1.6;margin-top:8px">
+            <strong>إذا لم يكن أنت:</strong> غيّر كلمة مرورك فوراً وأبلغ مسؤول النظام.
+          </p>
+
+          <p style="color:#94a3b8;font-size:11px;margin-top:24px;text-align:center">
+            هذه رسالة تلقائية من نظام MawaridX
+          </p>
+        </div>
+      </div>
+    `,
+  });
+}
+
 export async function sendNotificationEmail(employeeEmail: string, title: string, message: string) {
   return sendEmail({
     to: employeeEmail,

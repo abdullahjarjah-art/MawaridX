@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
+import { verifyFileSignature } from "@/lib/file-validation";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -24,11 +25,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!allowed.includes(file.type)) return NextResponse.json({ error: "يُسمح فقط بصور JPEG أو PNG أو WebP" }, { status: 400 });
   if (file.size > 3 * 1024 * 1024) return NextResponse.json({ error: "حجم الصورة يجب ألا يتجاوز 3 ميجابايت" }, { status: 400 });
 
+  const buffer = Buffer.from(await file.arrayBuffer());
+  if (!verifyFileSignature(buffer, file.type, file.name)) {
+    return NextResponse.json({ error: "محتوى الصورة لا يطابق نوعها" }, { status: 400 });
+  }
+
   const ext = file.type === "image/png" ? ".png" : file.type === "image/webp" ? ".webp" : ".jpg";
   const fileName = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}${ext}`;
   const dir = path.join(process.cwd(), "public", "uploads", "avatars");
   await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, fileName), Buffer.from(await file.arrayBuffer()));
+  await writeFile(path.join(dir, fileName), buffer);
 
   const photoUrl = `/uploads/avatars/${fileName}`;
   await prisma.employee.update({ where: { id }, data: { photo: photoUrl } });

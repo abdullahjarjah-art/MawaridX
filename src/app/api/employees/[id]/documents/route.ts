@@ -49,11 +49,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!allowed.includes(file.type)) return NextResponse.json({ error: "نوع غير مدعوم — صور أو PDF فقط" }, { status: 400 });
     if (file.size > 10 * 1024 * 1024) return NextResponse.json({ error: "الحجم يجب ألا يتجاوز 10 ميجابايت" }, { status: 400 });
 
-    const ext = path.extname(file.name).toLowerCase() || ".bin";
+    const buffer = Buffer.from(await file.arrayBuffer());
+    // Magic-byte verification
+    const { verifyFileSignature } = await import("@/lib/file-validation");
+    if (!verifyFileSignature(buffer, file.type, file.name)) {
+      return NextResponse.json({ error: "محتوى الملف لا يطابق نوعه" }, { status: 400 });
+    }
+
+    const ext = path.extname(file.name).toLowerCase().slice(0, 8) || ".bin";
     const fileName = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}${ext}`;
     const dir = path.join(process.cwd(), "public", "uploads", "documents");
     await mkdir(dir, { recursive: true });
-    await writeFile(path.join(dir, fileName), Buffer.from(await file.arrayBuffer()));
+    await writeFile(path.join(dir, fileName), buffer);
     fileUrl = `/uploads/documents/${fileName}`;
   }
 

@@ -3,11 +3,12 @@ import { getSession } from "@/lib/auth";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
+import { verifyFileSignature } from "@/lib/file-validation";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
-// رفع مرفقات (مرضية، طلبات...)
+// Upload general attachments (sick notes, request docs, etc.)
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
@@ -24,14 +25,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "حجم الملف يجب ألا يتجاوز 5 ميجابايت" }, { status: 400 });
   }
 
-  // اسم آمن للمجلد
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  // ── Magic-byte verification: actual content must match claimed type ──
+  if (!verifyFileSignature(buffer, file.type, file.name)) {
+    return NextResponse.json(
+      { error: "محتوى الملف لا يطابق نوعه — قد يكون ملفاً مزوّراً" },
+      { status: 400 }
+    );
+  }
+
+  // Safe folder name
   const safeFolder = folder.replace(/[^a-z0-9_-]/gi, "").slice(0, 32) || "general";
   const ext = path.extname(file.name).toLowerCase().slice(0, 8) || "";
   const fileName = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}${ext}`;
   const uploadDir = path.join(process.cwd(), "public", "uploads", safeFolder);
   await mkdir(uploadDir, { recursive: true });
 
-  const buffer = Buffer.from(await file.arrayBuffer());
   await writeFile(path.join(uploadDir, fileName), buffer);
 
   const url = `/uploads/${safeFolder}/${fileName}`;
