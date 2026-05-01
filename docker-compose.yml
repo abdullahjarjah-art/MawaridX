@@ -1,10 +1,9 @@
 # ──────────────────────────────────────────────────────────
 # MawaridX — Production multi-tenant compose for Hostinger VPS
-# - hr-company-a is the ONLY service that builds the image.
-#   Tenants B and C reference the same image to avoid OOM during
-#   parallel builds on small VPS plans (Hostinger KVM 2 = 2 GB RAM).
-# - 1 nginx reverse proxy on 80/443 (only host-exposed service)
-# - All apps on internal network, no host port exposure
+# All three app services share the SAME Dockerfile + build cache.
+# Docker builds once; layers are reused for B and C instantly.
+# 1 nginx reverse proxy on 80/443 (only host-exposed service)
+# All apps on internal network, no host port exposure
 # ──────────────────────────────────────────────────────────
 
 x-app-env: &app-env
@@ -19,6 +18,11 @@ x-app-env: &app-env
   VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
   VAPID_EMAIL: ${VAPID_EMAIL}
 
+x-build: &build
+  build:
+    context: .
+    dockerfile: Dockerfile
+
 x-healthcheck: &healthcheck
   test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/"]
   interval: 30s
@@ -28,12 +32,9 @@ x-healthcheck: &healthcheck
 
 services:
 
-  # ────────── Tenant 1 — builds the image (others reuse it) ──────────
+  # ────────── Tenant 1 ──────────
   hr-company-a:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: mawaridx-app:latest
+    <<: *build
     container_name: mawaridx-company-a
     restart: unless-stopped
     networks:
@@ -48,9 +49,9 @@ services:
       - company-a-backups:/app/backups
     healthcheck: *healthcheck
 
-  # ────────── Tenant 2 — reuses the image built by tenant A ──────────
+  # ────────── Tenant 2 ──────────
   hr-company-b:
-    image: mawaridx-app:latest
+    <<: *build
     container_name: mawaridx-company-b
     restart: unless-stopped
     networks:
@@ -68,9 +69,9 @@ services:
       - company-b-backups:/app/backups
     healthcheck: *healthcheck
 
-  # ────────── Tenant 3 — reuses the image built by tenant A ──────────
+  # ────────── Tenant 3 ──────────
   hr-company-c:
-    image: mawaridx-app:latest
+    <<: *build
     container_name: mawaridx-company-c
     restart: unless-stopped
     networks:

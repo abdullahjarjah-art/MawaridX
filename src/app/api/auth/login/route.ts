@@ -84,8 +84,8 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // ── 2FA: Super admin gets OTP via email ──
-    if (isSuperAdminEmail(user.email)) {
+    // ── 2FA: Super admin gets OTP via email (unless bypassed for demo) ──
+    if (isSuperAdminEmail(user.email) && process.env.BYPASS_2FA !== "true") {
       const { code } = createOtp(user.id, user.email, user.role, user.employee?.id);
       sendOtpEmail(user.email, code).catch(() => {});
       const [local, domain] = user.email.split("@");

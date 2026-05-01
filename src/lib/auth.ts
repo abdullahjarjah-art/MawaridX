@@ -1,18 +1,20 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-// ── JWT secret: must be set in production ──
+// ── JWT secret: validated lazily at request time (not at build time) ──
 // Dev fallback exists only to make local development easier.
 // In production, this MUST come from the environment or the
 // app refuses to sign / verify tokens.
-const RAW_SECRET = process.env.JWT_SECRET;
-if (process.env.NODE_ENV === "production" && (!RAW_SECRET || RAW_SECRET.length < 32)) {
-  throw new Error(
-    "[security] JWT_SECRET must be set to a strong value (≥32 chars) in production. " +
-      "Generate with: openssl rand -base64 64"
-  );
+function getSecret(): Uint8Array {
+  const raw = process.env.JWT_SECRET;
+  if (process.env.NODE_ENV === "production" && (!raw || raw.length < 32)) {
+    throw new Error(
+      "[security] JWT_SECRET must be set to a strong value (≥32 chars) in production. " +
+        "Generate with: openssl rand -base64 64"
+    );
+  }
+  return new TextEncoder().encode(raw || "dev-only-secret-do-not-use-in-prod");
 }
-const SECRET = new TextEncoder().encode(RAW_SECRET || "dev-only-secret-do-not-use-in-prod");
 const COOKIE = "hr_token";
 
 // ── Session lifetime ──
@@ -32,12 +34,12 @@ export async function signToken(payload: JWTPayload) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_HOURS}h`)
-    .sign(SECRET);
+    .sign(getSecret());
 }
 
 export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, getSecret());
     return payload as unknown as JWTPayload;
   } catch {
     return null;

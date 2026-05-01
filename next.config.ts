@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     "*.serveousercontent.com",
     "*.loca.lt",
+    "*.trycloudflare.com",
   ],
 };
 

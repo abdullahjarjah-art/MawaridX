@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const buf = readBackup(name);
   if (!buf) return NextResponse.json({ error: "الملف غير موجود" }, { status: 404 });
 
-  return new NextResponse(buf, {
+  return new NextResponse(new Uint8Array(buf), {
     headers: {
       "Content-Type": "application/octet-stream",
       "Content-Disposition": `attachment; filename="${name}"`,

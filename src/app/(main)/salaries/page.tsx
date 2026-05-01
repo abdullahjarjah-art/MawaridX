@@ -454,9 +454,12 @@ export default function SalariesPage() {
 
       {/* ── الخصومات الثابتة (قابلة للطي) ── */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 mb-5 overflow-hidden shadow-sm">
-        <button
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => setShowDeductions(v => !v)}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowDeductions(v => !v); } }}
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer select-none"
         >
           <div className="flex items-center gap-2">
             <Scissors className="h-4 w-4 text-rose-500" />
@@ -472,7 +475,7 @@ export default function SalariesPage() {
             </Button>
             {showDeductions ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
           </div>
-        </button>
+        </div>
 
         {showDeductions && (
           <div className="px-4 pb-4 border-t border-gray-100 dark:border-gray-700">

@@ -28,7 +28,8 @@ export default function SaudizationPage() {
 
   useEffect(() => { load(); }, []);
 
-  const updateTarget = async (band: string) => {
+  const updateTarget = async (band: string | null) => {
+    if (!band) return;
     setSaving(true);
     await fetch("/api/saudization", {
       method: "POST",
