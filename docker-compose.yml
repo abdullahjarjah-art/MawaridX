@@ -1,102 +1,92 @@
 # ──────────────────────────────────────────────────────────
 # MawaridX — Production multi-tenant compose for Hostinger VPS
-# - 3 tenant app containers (SQLite per tenant, mounted volumes)
+# - hr-company-a is the ONLY service that builds the image.
+#   Tenants B and C reference the same image to avoid OOM during
+#   parallel builds on small VPS plans (Hostinger KVM 2 = 2 GB RAM).
 # - 1 nginx reverse proxy on 80/443 (only host-exposed service)
 # - All apps on internal network, no host port exposure
 # ──────────────────────────────────────────────────────────
 
-x-app-common: &app-common
-  build:
-    context: .
-    dockerfile: Dockerfile
-  restart: unless-stopped
-  networks:
-    - mawaridx-internal
-  environment:
-    NODE_ENV: production
-    NEXT_TELEMETRY_DISABLED: "1"
-    PORT: "3000"
-    DATABASE_URL: "file:./prisma/hr.db"
-    JWT_SECRET: ${JWT_SECRET}
-    SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS}
-    BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
-    NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
-    VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
-    VAPID_EMAIL: ${VAPID_EMAIL}
-  healthcheck:
-    test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/"]
-    interval: 30s
-    timeout: 5s
-    retries: 3
-    start_period: 45s
+x-app-env: &app-env
+  NODE_ENV: production
+  NEXT_TELEMETRY_DISABLED: "1"
+  PORT: "3000"
+  DATABASE_URL: "file:./prisma/hr.db"
+  JWT_SECRET: ${JWT_SECRET}
+  SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS}
+  BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
+  VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+  VAPID_EMAIL: ${VAPID_EMAIL}
+
+x-healthcheck: &healthcheck
+  test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/"]
+  interval: 30s
+  timeout: 5s
+  retries: 3
+  start_period: 45s
 
 services:
 
-  # ────────── Tenant 1 ──────────
+  # ────────── Tenant 1 — builds the image (others reuse it) ──────────
   hr-company-a:
-    <<: *app-common
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mawaridx-app:latest
     container_name: mawaridx-company-a
+    restart: unless-stopped
+    networks:
+      - mawaridx-internal
     environment:
-      NODE_ENV: production
-      NEXT_TELEMETRY_DISABLED: "1"
-      PORT: "3000"
-      DATABASE_URL: "file:./prisma/hr.db"
-      JWT_SECRET: ${JWT_SECRET}
-      SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS}
-      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
-      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
-      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
-      VAPID_EMAIL: ${VAPID_EMAIL}
+      <<: *app-env
       COMPANY_NAME: ${COMPANY_A_NAME:-Company A}
       NEXT_PUBLIC_APP_URL: ${COMPANY_A_URL}
     volumes:
       - company-a-db:/app/prisma
       - company-a-uploads:/app/public/uploads
       - company-a-backups:/app/backups
+    healthcheck: *healthcheck
 
-  # ────────── Tenant 2 ──────────
+  # ────────── Tenant 2 — reuses the image built by tenant A ──────────
   hr-company-b:
-    <<: *app-common
+    image: mawaridx-app:latest
     container_name: mawaridx-company-b
+    restart: unless-stopped
+    networks:
+      - mawaridx-internal
+    depends_on:
+      hr-company-a:
+        condition: service_healthy
     environment:
-      NODE_ENV: production
-      NEXT_TELEMETRY_DISABLED: "1"
-      PORT: "3000"
-      DATABASE_URL: "file:./prisma/hr.db"
-      JWT_SECRET: ${JWT_SECRET}
-      SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS}
-      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
-      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
-      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
-      VAPID_EMAIL: ${VAPID_EMAIL}
+      <<: *app-env
       COMPANY_NAME: ${COMPANY_B_NAME:-Company B}
       NEXT_PUBLIC_APP_URL: ${COMPANY_B_URL}
     volumes:
       - company-b-db:/app/prisma
       - company-b-uploads:/app/public/uploads
       - company-b-backups:/app/backups
+    healthcheck: *healthcheck
 
-  # ────────── Tenant 3 ──────────
+  # ────────── Tenant 3 — reuses the image built by tenant A ──────────
   hr-company-c:
-    <<: *app-common
+    image: mawaridx-app:latest
     container_name: mawaridx-company-c
+    restart: unless-stopped
+    networks:
+      - mawaridx-internal
+    depends_on:
+      hr-company-a:
+        condition: service_healthy
     environment:
-      NODE_ENV: production
-      NEXT_TELEMETRY_DISABLED: "1"
-      PORT: "3000"
-      DATABASE_URL: "file:./prisma/hr.db"
-      JWT_SECRET: ${JWT_SECRET}
-      SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS}
-      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
-      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
-      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
-      VAPID_EMAIL: ${VAPID_EMAIL}
+      <<: *app-env
       COMPANY_NAME: ${COMPANY_C_NAME:-Company C}
       NEXT_PUBLIC_APP_URL: ${COMPANY_C_URL}
     volumes:
       - company-c-db:/app/prisma
       - company-c-uploads:/app/public/uploads
       - company-c-backups:/app/backups
+    healthcheck: *healthcheck
 
   # ────────── Reverse Proxy (only host-exposed service) ──────────
   nginx:

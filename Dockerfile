@@ -8,8 +8,9 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# better-sqlite3 needs python3 + make + g++ for native compilation
-RUN apk add --no-cache libc6-compat python3 make g++
+# better-sqlite3 + Prisma engines need build tools BEFORE npm ci runs.
+# openssl is required by Prisma's query engine on Alpine.
+RUN apk add --no-cache libc6-compat openssl python3 make g++
 
 COPY package.json package-lock.json* ./
 RUN npm ci --no-audit --no-fund
@@ -18,7 +19,8 @@ RUN npm ci --no-audit --no-fund
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-RUN apk add --no-cache libc6-compat
+# Same toolchain — Prisma generate + build may invoke native compilers
+RUN apk add --no-cache libc6-compat openssl python3 make g++
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
