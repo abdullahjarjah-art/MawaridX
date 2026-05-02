@@ -29,6 +29,7 @@ import {
   FolderOpen,
 } from "lucide-react";
 import { MawaridXLogo, MawaridXWordmark } from "@/components/mawaridx-logo";
+import { useBranding } from "@/components/branding-provider";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/notification-bell";
@@ -64,6 +65,7 @@ export function SidebarNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { t } = useLang();
+  const { branding } = useBranding();
   const [open, setOpen] = useState(false);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
 
@@ -108,10 +110,19 @@ export function SidebarNav() {
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-64 glass-strong border-l border-brand-border min-h-screen fixed right-0 top-0 z-30 shadow-soft">
         <div className="relative flex items-center gap-3 px-5 py-4 border-b border-brand-border">
-          <MawaridXLogo size={38} animate />
-          <div>
-            <MawaridXWordmark className="text-base" />
-            <p className="text-[10px] text-brand-muted mt-0.5">نظام إدارة الموارد البشرية</p>
+          {branding.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={branding.logoUrl} alt={branding.displayName} className="h-10 w-10 rounded-lg object-contain bg-white/50" />
+          ) : (
+            <MawaridXLogo size={38} animate />
+          )}
+          <div className="min-w-0">
+            {branding.logoUrl ? (
+              <p className="text-base font-bold truncate" style={{ color: branding.primaryColor }}>{branding.displayName}</p>
+            ) : (
+              <MawaridXWordmark className="text-base" />
+            )}
+            <p className="text-[10px] text-brand-muted mt-0.5 truncate">{branding.logoUrl ? "نظام إدارة الموارد البشرية" : "نظام إدارة الموارد البشرية"}</p>
           </div>
           {employeeId && (
             <div className="absolute left-3 top-1/2 -translate-y-1/2">
@@ -136,9 +147,18 @@ export function SidebarNav() {
 
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-30 glass-strong border-b border-brand-border px-3 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <MawaridXLogo size={28} />
-          <MawaridXWordmark className="text-xs" />
+        <div className="flex items-center gap-2 min-w-0">
+          {branding.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={branding.logoUrl} alt={branding.displayName} className="h-7 w-7 rounded object-contain" />
+          ) : (
+            <MawaridXLogo size={28} />
+          )}
+          {branding.logoUrl ? (
+            <p className="text-xs font-bold truncate" style={{ color: branding.primaryColor }}>{branding.displayName}</p>
+          ) : (
+            <MawaridXWordmark className="text-xs" />
+          )}
         </div>
         <div className="flex items-center gap-1">
           {employeeId && <NotificationBell employeeId={employeeId} />}

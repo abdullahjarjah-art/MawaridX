@@ -42,6 +42,7 @@ services:
     environment:
       <<: *app-env
       COMPANY_NAME: ${COMPANY_A_NAME:-Company A}
+      COMPANY_PLAN: ${COMPANY_A_PLAN:-trial}
       NEXT_PUBLIC_APP_URL: ${COMPANY_A_URL}
     volumes:
       - company-a-db:/app/prisma
@@ -62,6 +63,7 @@ services:
     environment:
       <<: *app-env
       COMPANY_NAME: ${COMPANY_B_NAME:-Company B}
+      COMPANY_PLAN: ${COMPANY_B_PLAN:-trial}
       NEXT_PUBLIC_APP_URL: ${COMPANY_B_URL}
     volumes:
       - company-b-db:/app/prisma
@@ -82,6 +84,7 @@ services:
     environment:
       <<: *app-env
       COMPANY_NAME: ${COMPANY_C_NAME:-Company C}
+      COMPANY_PLAN: ${COMPANY_C_PLAN:-trial}
       NEXT_PUBLIC_APP_URL: ${COMPANY_C_URL}
     volumes:
       - company-c-db:/app/prisma

@@ -619,6 +619,27 @@ export default function SettingsPage() {
           </Link>
         </CardContent>
       </Card>
+
+      {/* الهوية البصرية */}
+      <Card className="card-glass border-brand-border shadow-soft">
+        <CardContent className="p-5 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center shrink-0">
+              <ShieldCheck className="h-5 w-5 text-violet-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900">{t("الهوية البصرية")}</p>
+              <p className="text-sm text-gray-500">{t("اسم الشركة، الشعار، الألوان، وبيانات المستندات")}</p>
+            </div>
+          </div>
+          <Link href="/settings/branding">
+            <Button variant="outline" className="gap-2 shrink-0">
+              {t("تخصيص الهوية")}
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
     </div>
   );
 }

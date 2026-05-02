@@ -7,6 +7,7 @@ import "leaflet/dist/leaflet.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LangProvider } from "@/components/lang-provider";
+import { BrandingProvider } from "@/components/branding-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -59,7 +60,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-brand-canvas text-brand-ink transition-colors font-arabic">
         <ThemeProvider>
           <LangProvider>
-            <TooltipProvider>{children}</TooltipProvider>
+            <BrandingProvider>
+              <TooltipProvider>{children}</TooltipProvider>
+            </BrandingProvider>
           </LangProvider>
         </ThemeProvider>
       </body>
