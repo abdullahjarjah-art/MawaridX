@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 
-const DB_PATH   = path.join(process.cwd(), "prisma", "dev.db");
+const DB_PATH   = path.join(process.cwd(), "prisma", "hr.db");
 const BACKUP_DIR = path.join(process.cwd(), "backups");
 const MAX_BACKUPS = 14; // احتفظ بآخر 14 نسخة
 
