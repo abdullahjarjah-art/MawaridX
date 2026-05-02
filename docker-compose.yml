@@ -1,7 +1,8 @@
 # ──────────────────────────────────────────────────────────
 # MawaridX — Production multi-tenant compose for Hostinger VPS
-# All three app services share the SAME Dockerfile + build cache.
-# Docker builds once; layers are reused for B and C instantly.
+# Only hr-company-a builds the image. Tenants B and C reuse the
+# same `mawaridx-app:latest` tag — building three identical images
+# in parallel would OOM the KVM 2 (8 GB) VPS.
 # 1 nginx reverse proxy on 80/443 (only host-exposed service)
 # All apps on internal network, no host port exposure
 # ──────────────────────────────────────────────────────────
@@ -18,11 +19,6 @@ x-app-env: &app-env
   VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
   VAPID_EMAIL: ${VAPID_EMAIL}
 
-x-build: &build
-  build:
-    context: .
-    dockerfile: Dockerfile
-
 x-healthcheck: &healthcheck
   test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/"]
   interval: 30s
@@ -32,15 +28,19 @@ x-healthcheck: &healthcheck
 
 services:
 
-  # ────────── Tenant 1 ──────────
+  # ────────── Tenant 1 — the ONLY service that builds the image ──────────
   hr-company-a:
-    <<: *build
+    image: mawaridx-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: mawaridx-company-a
     restart: unless-stopped
     networks:
       - mawaridx-internal
     environment:
       <<: *app-env
+      TENANT_ID: company-a
       COMPANY_NAME: ${COMPANY_A_NAME:-Company A}
       COMPANY_PLAN: ${COMPANY_A_PLAN:-trial}
       NEXT_PUBLIC_APP_URL: ${COMPANY_A_URL}
@@ -50,18 +50,18 @@ services:
       - company-a-backups:/app/backups
     healthcheck: *healthcheck
 
-  # ────────── Tenant 2 ──────────
+  # ────────── Tenant 2 — reuses the image built by tenant A ──────────
   hr-company-b:
-    <<: *build
+    image: mawaridx-app:latest
     container_name: mawaridx-company-b
     restart: unless-stopped
     networks:
       - mawaridx-internal
     depends_on:
-      hr-company-a:
-        condition: service_healthy
+      - hr-company-a
     environment:
       <<: *app-env
+      TENANT_ID: company-b
       COMPANY_NAME: ${COMPANY_B_NAME:-Company B}
       COMPANY_PLAN: ${COMPANY_B_PLAN:-trial}
       NEXT_PUBLIC_APP_URL: ${COMPANY_B_URL}
@@ -71,18 +71,18 @@ services:
       - company-b-backups:/app/backups
     healthcheck: *healthcheck
 
-  # ────────── Tenant 3 ──────────
+  # ────────── Tenant 3 — reuses the image built by tenant A ──────────
   hr-company-c:
-    <<: *build
+    image: mawaridx-app:latest
     container_name: mawaridx-company-c
     restart: unless-stopped
     networks:
       - mawaridx-internal
     depends_on:
-      hr-company-a:
-        condition: service_healthy
+      - hr-company-a
     environment:
       <<: *app-env
+      TENANT_ID: company-c
       COMPANY_NAME: ${COMPANY_C_NAME:-Company C}
       COMPANY_PLAN: ${COMPANY_C_PLAN:-trial}
       NEXT_PUBLIC_APP_URL: ${COMPANY_C_URL}
@@ -107,12 +107,9 @@ services:
     networks:
       - mawaridx-internal
     depends_on:
-      hr-company-a:
-        condition: service_healthy
-      hr-company-b:
-        condition: service_healthy
-      hr-company-c:
-        condition: service_healthy
+      - hr-company-a
+      - hr-company-b
+      - hr-company-c
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
       interval: 30s

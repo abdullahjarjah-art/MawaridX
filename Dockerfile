@@ -4,7 +4,7 @@
 # Stack: Next.js 16 + Prisma 7 + better-sqlite3
 # ──────────────────────────────────────────────────────────
 
-# ============ Stage 1: deps (install with native build tools) ============
+# ============ Stage 1: deps (install + generate Prisma client) ============
 FROM node:20-alpine AS deps
 WORKDIR /app
 
@@ -12,24 +12,29 @@ WORKDIR /app
 # openssl is required by Prisma's query engine on Alpine.
 RUN apk add --no-cache libc6-compat openssl python3 make g++
 
+# Copy dependency manifests AND prisma schema so prisma generate can run
+# in this stage. This produces node_modules/.prisma which the builder
+# and runner stages then COPY out — without this, the .prisma directory
+# never exists and later COPY --from=... lookups fail with
+# "/app/node_modules/.prisma: not found".
 COPY package.json package-lock.json* ./
+COPY prisma ./prisma
 RUN npm ci --no-audit --no-fund
+RUN npx prisma generate
 
-# ============ Stage 2: builder (compile Next.js + Prisma client) ============
+# ============ Stage 2: builder (compile Next.js) ============
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Same toolchain — Prisma generate + build may invoke native compilers
+# Same toolchain — Next.js build may invoke native compilers
 RUN apk add --no-cache libc6-compat openssl python3 make g++
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# node_modules already includes the generated Prisma client from deps
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# Generate Prisma client BEFORE build (required by route handlers)
-RUN npx prisma generate
 
 # Build Next.js (uses standalone output — see next.config.ts)
 RUN npm run build
