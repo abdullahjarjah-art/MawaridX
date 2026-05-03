@@ -1,10 +1,12 @@
 # ──────────────────────────────────────────────────────────
-# MawaridX — Production multi-tenant compose for Hostinger VPS
-# Only hr-company-a builds the image. Tenants B and C reuse the
-# same `mawaridx-app:latest` tag — building three identical images
-# in parallel would OOM the KVM 2 (8 GB) VPS.
-# 1 nginx reverse proxy on 80/443 (only host-exposed service)
-# All apps on internal network, no host port exposure
+# MawaridX — Production single-tenant compose for Hostinger VPS
+# Currently runs ONE tenant (hr-company-a) + nginx reverse proxy.
+# To add another tenant later: copy the hr-company-a service block,
+# rename to hr-company-b, REMOVE the `build:` section (use the
+# already-built `mawaridx-app:latest` image), add `depends_on:
+# [hr-company-a]`, add company-b-* volumes below, then add the
+# subdomain → upstream mapping in nginx.conf.
+# Building multiple images in parallel OOMs the KVM 2 (8 GB) VPS.
 # ──────────────────────────────────────────────────────────
 
 x-app-env: &app-env
@@ -28,7 +30,7 @@ x-healthcheck: &healthcheck
 
 services:
 
-  # ────────── Tenant 1 — the ONLY service that builds the image ──────────
+  # ────────── Tenant 1 — builds the shared image ──────────
   hr-company-a:
     image: mawaridx-app:latest
     build:
@@ -50,48 +52,6 @@ services:
       - company-a-backups:/app/backups
     healthcheck: *healthcheck
 
-  # ────────── Tenant 2 — reuses the image built by tenant A ──────────
-  hr-company-b:
-    image: mawaridx-app:latest
-    container_name: mawaridx-company-b
-    restart: unless-stopped
-    networks:
-      - mawaridx-internal
-    depends_on:
-      - hr-company-a
-    environment:
-      <<: *app-env
-      TENANT_ID: company-b
-      COMPANY_NAME: ${COMPANY_B_NAME:-Company B}
-      COMPANY_PLAN: ${COMPANY_B_PLAN:-trial}
-      NEXT_PUBLIC_APP_URL: ${COMPANY_B_URL}
-    volumes:
-      - company-b-db:/app/prisma
-      - company-b-uploads:/app/public/uploads
-      - company-b-backups:/app/backups
-    healthcheck: *healthcheck
-
-  # ────────── Tenant 3 — reuses the image built by tenant A ──────────
-  hr-company-c:
-    image: mawaridx-app:latest
-    container_name: mawaridx-company-c
-    restart: unless-stopped
-    networks:
-      - mawaridx-internal
-    depends_on:
-      - hr-company-a
-    environment:
-      <<: *app-env
-      TENANT_ID: company-c
-      COMPANY_NAME: ${COMPANY_C_NAME:-Company C}
-      COMPANY_PLAN: ${COMPANY_C_PLAN:-trial}
-      NEXT_PUBLIC_APP_URL: ${COMPANY_C_URL}
-    volumes:
-      - company-c-db:/app/prisma
-      - company-c-uploads:/app/public/uploads
-      - company-c-backups:/app/backups
-    healthcheck: *healthcheck
-
   # ────────── Reverse Proxy (only host-exposed service) ──────────
   nginx:
     image: nginx:1.27-alpine
@@ -108,8 +68,6 @@ services:
       - mawaridx-internal
     depends_on:
       - hr-company-a
-      - hr-company-b
-      - hr-company-c
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
       interval: 30s
@@ -124,10 +82,4 @@ volumes:
   company-a-db:
   company-a-uploads:
   company-a-backups:
-  company-b-db:
-  company-b-uploads:
-  company-b-backups:
-  company-c-db:
-  company-c-uploads:
-  company-c-backups:
   certbot-www:
