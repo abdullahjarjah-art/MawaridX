@@ -7,7 +7,9 @@
 > **Repo**: `https://github.com/abdullahjarjah-art/MawaridX`
 > **Default branch**: `main`
 > **Owner / super-admin email**: `abdullah.j.arjah@gmail.com`
-> **Last-known-good commit**: `583aabc` (docker prisma fix + shared image)
+> **Last-known-good commit**: `edff00f` (sync: local version takes precedence)
+> **Local dev path**: `G:\Shared drives\WEB\MawaridX\Project File` (Google Drive shared folder)
+> **Git remote**: `https://github.com/abdullahjarjah-art/MawaridX.git`
 
 ---
 
@@ -1144,21 +1146,30 @@ owner has explicitly said "go ahead and fix it".
 
 ## 22. Where to Pick Up
 
-Last work session ended with:
-- `583aabc fix(docker): generate prisma in deps stage + share image across tenants`
+### Changes made in the latest session (2026-05-04)
 
-The owner expects this to make the Hostinger deploy succeed. Next
-likely tasks:
-1. Verify Hostinger build passes; if not, debug from logs.
-2. Address P0 issues from §16 (volume layout + initial admin bootstrap).
-3. Apply branding to the documents page (`(main)/company-docs/page.tsx`)
-   per the owner's earlier request. Suggested approach was outlined in
-   the chat but not yet implemented — use `useBranding()` for logo on
-   the page header, watermark on trial plans, gate uploads by
-   `features.maxStorageGB`, and call `brandingForPdf(branding)` before
-   generating any document PDFs.
-4. Consider adding `/api/features` endpoint + `useFeatures()` hook
-   so client components can branch on plan tier.
+1. **Sidebar scroll fix** (`src/components/sidebar-nav.tsx`)
+   - Changed `min-h-screen` → `h-screen` on the desktop `<aside>` element.
+   - Root cause: `min-h-screen` let the sidebar grow beyond the viewport, pushing the logout button off-screen. With `h-screen` the sidebar is exactly viewport height, the nav section scrolls inside it, and the logout footer stays pinned at the bottom.
+
+2. **Hydration mismatch fix** (`src/components/mawaridx-logo.tsx`)
+   - Replaced `Math.random()` ID generation with React `useId()` hook.
+   - Added `"use client"` directive.
+   - `Math.random()` produced different IDs on server vs client → React hydration mismatch. `useId()` produces stable, consistent IDs across SSR and client.
+
+3. **Project moved to Google Drive**
+   - Dev path is now: `G:\Shared drives\WEB\MawaridX\Project File`
+   - Git initialized fresh in this folder, linked to existing GitHub remote.
+   - To start dev server: `cd "G:\Shared drives\WEB\MawaridX\Project File" && npm run dev`
+   - To push changes to GitHub: `git add . && git commit -m "description" && git push`
+
+### Pending tasks (ordered by priority)
+1. **Verify Hostinger deploy** — confirm build passes with latest commit.
+2. **P0: Volume layout fix** — `company-X-db:/app/prisma` masks schema on re-deploy (see §16).
+3. **P0: Initial admin bootstrap** — first registered user stays `role: "employee"` even if super admin email (see §16).
+4. **Apply branding to company-docs page** — use `useBranding()` for page header logo, watermark on trial plan, gate uploads by `features.maxStorageGB`, call `brandingForPdf(branding)` before generating PDFs.
+5. **Build `/api/features` endpoint** — trivial route (see §16 code snippet) + `useFeatures()` hook for client components.
+6. **Fix `requests/[id]` role trust** — derive role from session, not request body (see §16 P1).
 
 Good luck. The owner is hands-on and will tell you when something is
 wrong — but they're also patient with reasoned trade-off explanations.
