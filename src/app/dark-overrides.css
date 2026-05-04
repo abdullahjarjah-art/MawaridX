@@ -1,0 +1,134 @@
+/* ─────────────────────────────────────────────────
+   Dark Mode — Auto overrides for all pages
+   This file is separate from globals.css so Tailwind v4
+   doesn't strip the utility-class-based selectors.
+   MawaridX — refined dark palette (slate + brand tint)
+   ───────────────────────────────────────────────── */
+.dark {
+  color-scheme: dark;
+}
+
+/* ── Backgrounds — refined MawaridX dark ── */
+.dark .bg-white   { background-color: oklch(20% 0.02 252) !important; }
+.dark .bg-gray-50 { background-color: oklch(14% 0.02 252) !important; }
+.dark .bg-gray-100 { background-color: oklch(22% 0.02 252) !important; }
+.dark .bg-gray-200 { background-color: oklch(28% 0.02 252) !important; }
+
+/* ── Text ── */
+.dark .text-gray-900 { color: #f1f5f9 !important; }
+.dark .text-gray-800 { color: #e2e8f0 !important; }
+.dark .text-gray-700 { color: #cbd5e1 !important; }
+.dark .text-gray-600 { color: #94a3b8 !important; }
+.dark .text-gray-500 { color: #94a3b8 !important; }
+.dark .text-gray-400 { color: #64748b !important; }
+.dark .text-gray-300 { color: #475569 !important; }
+
+/* ── Borders ── */
+.dark .border-gray-200 { border-color: #334155 !important; }
+.dark .border-gray-100 { border-color: #1e293b !important; }
+.dark .border-gray-300 { border-color: #475569 !important; }
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: #1e293b !important; }
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #334155 !important; }
+
+/* ── Hover states ── */
+.dark .hover\:bg-gray-50:hover { background-color: #334155 !important; }
+.dark .hover\:bg-gray-100:hover { background-color: #334155 !important; }
+
+/* ── Colored light backgrounds (stat cards, badges) ── */
+.dark .bg-sky-50    { background-color: rgba(12, 74, 110, 0.25) !important; }
+.dark .bg-sky-100   { background-color: rgba(12, 74, 110, 0.35) !important; }
+.dark .bg-green-50  { background-color: rgba(20, 83, 45, 0.25) !important; }
+.dark .bg-green-100 { background-color: rgba(20, 83, 45, 0.35) !important; }
+.dark .bg-yellow-50 { background-color: rgba(113, 63, 18, 0.25) !important; }
+.dark .bg-yellow-100 { background-color: rgba(113, 63, 18, 0.35) !important; }
+.dark .bg-amber-50  { background-color: rgba(120, 53, 15, 0.25) !important; }
+.dark .bg-amber-100 { background-color: rgba(120, 53, 15, 0.35) !important; }
+.dark .bg-rose-50   { background-color: rgba(136, 19, 55, 0.25) !important; }
+.dark .bg-rose-100  { background-color: rgba(136, 19, 55, 0.35) !important; }
+.dark .bg-red-50    { background-color: rgba(127, 29, 29, 0.25) !important; }
+.dark .bg-red-100   { background-color: rgba(127, 29, 29, 0.35) !important; }
+.dark .bg-emerald-50 { background-color: rgba(6, 78, 59, 0.25) !important; }
+.dark .bg-emerald-100 { background-color: rgba(6, 78, 59, 0.35) !important; }
+.dark .bg-orange-50 { background-color: rgba(124, 45, 18, 0.25) !important; }
+.dark .bg-orange-100 { background-color: rgba(124, 45, 18, 0.35) !important; }
+.dark .bg-teal-50   { background-color: rgba(19, 78, 74, 0.25) !important; }
+.dark .bg-teal-100  { background-color: rgba(19, 78, 74, 0.35) !important; }
+.dark .bg-purple-50 { background-color: rgba(88, 28, 135, 0.25) !important; }
+.dark .bg-purple-100 { background-color: rgba(88, 28, 135, 0.35) !important; }
+.dark .bg-blue-50   { background-color: rgba(30, 58, 138, 0.25) !important; }
+.dark .bg-blue-100  { background-color: rgba(30, 58, 138, 0.35) !important; }
+.dark .bg-indigo-50 { background-color: rgba(49, 46, 129, 0.25) !important; }
+.dark .bg-indigo-100 { background-color: rgba(49, 46, 129, 0.35) !important; }
+
+/* ── Colored borders ── */
+.dark .border-sky-100,
+.dark .border-sky-200    { border-color: rgba(12, 74, 110, 0.4) !important; }
+.dark .border-green-100,
+.dark .border-green-200  { border-color: rgba(20, 83, 45, 0.4) !important; }
+.dark .border-yellow-100,
+.dark .border-yellow-200 { border-color: rgba(113, 63, 18, 0.4) !important; }
+.dark .border-rose-200   { border-color: rgba(136, 19, 55, 0.4) !important; }
+.dark .border-orange-100,
+.dark .border-orange-200 { border-color: rgba(124, 45, 18, 0.4) !important; }
+.dark .border-red-200    { border-color: rgba(127, 29, 29, 0.4) !important; }
+.dark .border-emerald-100 { border-color: rgba(6, 78, 59, 0.4) !important; }
+
+/* ── Tables ── */
+.dark table thead { background-color: #1e293b !important; }
+.dark table tbody tr:hover { background-color: #334155 !important; }
+
+/* ── Inputs & Forms ── */
+.dark input, .dark textarea, .dark select,
+.dark [data-slot="select-trigger"],
+.dark [role="combobox"] {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-color: #475569 !important;
+}
+.dark input::placeholder, .dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* ── Dialogs & Popovers ── */
+.dark [data-slot="dialog-overlay"] {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
+.dark [data-slot="dialog-content"],
+.dark [data-slot="select-content"],
+.dark [role="listbox"] {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+}
+.dark [role="option"]:hover,
+.dark [data-slot="select-item"]:hover {
+  background-color: #334155 !important;
+}
+
+/* ── Badges ── */
+.dark .bg-green-600 { background-color: #16a34a !important; }
+
+/* ── Scrollbar ── */
+.dark ::-webkit-scrollbar { width: 6px; }
+.dark ::-webkit-scrollbar-track { background: #0f172a; }
+.dark ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+
+/* ── Opacity adjustments ── */
+.dark .bg-sky-50\/40,
+.dark .bg-teal-50\/40,
+.dark .bg-orange-50\/40,
+.dark .bg-indigo-50\/40 {
+  background-color: rgba(30, 41, 59, 0.4) !important;
+}
+
+/* ── Ring colors ── */
+.dark .ring-gray-200 { --tw-ring-color: #334155 !important; }
+.dark .ring-gray-100 { --tw-ring-color: #1e293b !important; }
+
+/* ── Shadow adjustments ── */
+.dark .shadow-sm, .dark .shadow { box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important; }
+
+/* ── Specific component fixes ── */
+.dark .bg-gradient-to-r.from-sky-500,
+.dark .bg-gradient-to-l.from-sky-500 {
+  /* Keep sky gradients as-is in dark mode */
+}

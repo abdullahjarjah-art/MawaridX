@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MawaridX — نظام إدارة الموارد البشرية للسوق السعودي</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { font-family: 'IBM Plex Sans Arabic', system-ui, sans-serif; color: #0f172a; background: #f1f5f9; line-height: 1.6; }
+
+  /* ─── Slide structure ─── */
+  .slide {
+    min-height: 100vh; padding: 64px 80px; position: relative;
+    display: flex; flex-direction: column; justify-content: center;
+    background: #fff; border-bottom: 1px solid #e2e8f0;
+    page-break-after: always;
+  }
+  .slide-number {
+    position: absolute; top: 32px; left: 32px;
+    font-size: 12px; color: #94a3b8; font-weight: 600;
+    background: #f1f5f9; padding: 4px 12px; border-radius: 12px;
+  }
+  .slide-tag {
+    display: inline-block; font-size: 11px; font-weight: 700;
+    color: #0284c7; background: #e0f2fe; padding: 6px 14px;
+    border-radius: 999px; letter-spacing: 0.5px; margin-bottom: 16px;
+  }
+  h1 { font-size: 56px; font-weight: 900; line-height: 1.1; letter-spacing: -1px; }
+  h2 { font-size: 44px; font-weight: 900; line-height: 1.15; letter-spacing: -0.5px; margin-bottom: 12px; }
+  h3 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .lead { font-size: 20px; color: #475569; max-width: 720px; line-height: 1.6; }
+
+  /* ─── Brand gradient ─── */
+  .gradient-bg {
+    background: linear-gradient(135deg, #0c4a6e 0%, #0284c7 50%, #0ea5e9 100%);
+    color: white;
+  }
+  .gradient-bg .lead, .gradient-bg p { color: rgba(255,255,255,0.9); }
+  .gradient-bg .slide-tag { background: rgba(255,255,255,0.15); color: #fbbf24; }
+  .gradient-bg .slide-number { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); }
+
+  .gold { color: #fbbf24; }
+  .accent { background: linear-gradient(90deg, #fbbf24, #f59e0b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+  /* ─── Islamic pattern overlay ─── */
+  .pattern { position: absolute; inset: 0; opacity: 0.06; pointer-events: none;
+    background-image: radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0);
+    background-size: 32px 32px; }
+
+  /* ─── Cards / Grids ─── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 40px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 36px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 36px; }
+
+  .card {
+    background: white; border: 1px solid #e2e8f0; border-radius: 20px;
+    padding: 28px; transition: all 0.2s;
+  }
+  .card-icon {
+    width: 48px; height: 48px; border-radius: 14px;
+    background: linear-gradient(135deg, #0284c7, #0ea5e9);
+    display: flex; align-items: center; justify-content: center; margin-bottom: 16px;
+    color: white;
+  }
+  .card-gold .card-icon { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+  .card-rose .card-icon { background: linear-gradient(135deg, #e11d48, #f43f5e); }
+  .card-emerald .card-icon { background: linear-gradient(135deg, #059669, #10b981); }
+  .card-violet .card-icon { background: linear-gradient(135deg, #7c3aed, #a855f7); }
+  .card h3 { font-size: 17px; }
+  .card p { font-size: 14px; color: #64748b; }
+
+  /* ─── Mock screenshot frames ─── */
+  .screen {
+    background: white; border: 1px solid #cbd5e1; border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(15,23,42,0.12); overflow: hidden;
+    direction: rtl;
+  }
+  .screen-bar {
+    background: #f8fafc; padding: 10px 16px; display: flex; gap: 6px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .screen-bar span { width: 10px; height: 10px; border-radius: 50%; background: #cbd5e1; }
+  .screen-bar span:first-child { background: #ef4444; }
+  .screen-bar span:nth-child(2) { background: #f59e0b; }
+  .screen-bar span:nth-child(3) { background: #10b981; }
+  .screen-body { padding: 20px; }
+
+  /* ─── Table mock ─── */
+  .mock-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+  .mock-table th { text-align: right; color: #64748b; padding: 8px; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+  .mock-table td { padding: 10px 8px; border-bottom: 1px solid #f1f5f9; color: #0f172a; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 10px; font-weight: 700; }
+  .badge-green { background: #d1fae5; color: #065f46; }
+  .badge-amber { background: #fef3c7; color: #92400e; }
+  .badge-rose  { background: #ffe4e6; color: #9f1239; }
+  .badge-sky   { background: #e0f2fe; color: #075985; }
+
+  /* ─── Stats ─── */
+  .stat { text-align: center; padding: 20px; }
+  .stat-num { font-size: 48px; font-weight: 900; color: #0284c7; line-height: 1; letter-spacing: -1px; }
+  .stat-label { font-size: 13px; color: #64748b; margin-top: 6px; font-weight: 500; }
+
+  /* ─── Map mock ─── */
+  .map-mock {
+    height: 240px; border-radius: 16px; position: relative; overflow: hidden;
+    background:
+      radial-gradient(circle at 30% 40%, #bae6fd 0%, transparent 50%),
+      radial-gradient(circle at 70% 60%, #fef3c7 0%, transparent 50%),
+      linear-gradient(135deg, #e0f2fe, #f0fdf4);
+  }
+  .map-mock::after {
+    content: ''; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(0deg, transparent 24%, rgba(255,255,255,0.4) 25%, rgba(255,255,255,0.4) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.4) 75%, rgba(255,255,255,0.4) 76%, transparent 77%),
+      linear-gradient(90deg, transparent 24%, rgba(255,255,255,0.4) 25%, rgba(255,255,255,0.4) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.4) 75%, rgba(255,255,255,0.4) 76%, transparent 77%);
+    background-size: 50px 50px;
+  }
+  .pin {
+    position: absolute; width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(2,132,199,0.2); display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 8px rgba(2,132,199,0.1), 0 0 0 20px rgba(2,132,199,0.05);
+    z-index: 2;
+  }
+  .pin::before {
+    content: ''; width: 16px; height: 16px; border-radius: 50%;
+    background: #0284c7; border: 2px solid white;
+  }
+  .geofence {
+    position: absolute; width: 140px; height: 140px; border-radius: 50%;
+    border: 2px dashed #0284c7; background: rgba(2,132,199,0.06);
+    z-index: 1;
+  }
+
+  /* ─── Cover ─── */
+  .cover { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 40px; }
+  .logo-mark {
+    width: 120px; height: 120px; border-radius: 28px;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 32px; box-shadow: 0 20px 50px rgba(251,191,36,0.4);
+    font-size: 56px; font-weight: 900; color: white;
+  }
+  .cover h1 { font-size: 88px; line-height: 1; margin-bottom: 24px; }
+  .cover .lead { font-size: 22px; max-width: 700px; margin: 0 auto; }
+  .cover-tag {
+    margin-top: 40px; font-size: 14px; color: rgba(255,255,255,0.7);
+    letter-spacing: 4px; font-weight: 600;
+  }
+
+  /* ─── Highlight bar ─── */
+  .feature-row { display: flex; gap: 16px; margin-top: 24px; flex-wrap: wrap; }
+  .pill {
+    background: rgba(255,255,255,0.1); backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2); padding: 10px 20px;
+    border-radius: 999px; font-size: 14px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .pill-light {
+    background: #f1f5f9; border-color: #e2e8f0; color: #0f172a;
+  }
+
+  /* ─── Two column layout ─── */
+  .split { display: grid; grid-template-columns: 1.1fr 1fr; gap: 60px; align-items: center; }
+  ul.checks { list-style: none; margin-top: 24px; }
+  ul.checks li {
+    display: flex; gap: 12px; align-items: flex-start; padding: 10px 0;
+    font-size: 16px; color: #334155;
+  }
+  ul.checks li::before {
+    content: '✓'; color: #10b981; font-weight: 900; flex-shrink: 0;
+    width: 24px; height: 24px; background: #d1fae5; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+  }
+
+  .quote {
+    font-size: 32px; font-weight: 700; line-height: 1.4;
+    max-width: 800px; margin: 40px auto; text-align: center;
+    color: #0f172a;
+  }
+
+  /* ─── Print ─── */
+  @media print {
+    .slide { padding: 50px 60px; min-height: 100vh; height: 100vh; page-break-after: always; }
+    body { background: white; }
+  }
+
+  /* ─── Compact responsive ─── */
+  @media (max-width: 900px) {
+    .slide { padding: 40px 24px; }
+    h1 { font-size: 36px; }
+    h2 { font-size: 30px; }
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .split { grid-template-columns: 1fr; gap: 32px; }
+    .cover h1 { font-size: 56px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════ -->
+<!-- SLIDE 1: COVER                                        -->
+<!-- ════════════════════════════════════════════════════ -->
+<section class="slide cover gradient-bg">
+  <div class="pattern" style="color: white;"></div>
+  <div style="position: relative; z-index: 2;">
+    <div class="logo-mark">M</div>
+    <h1 style="color: white;">MawaridX</h1>
+    <p class="lead" style="color: rgba(255,255,255,0.85); font-size: 26px; margin-top: 8px;">
+      نظام إدارة الموارد البشرية
+    </p>
+    <p style="color: rgba(255,255,255,0.65); font-size: 17px; margin-top: 12px;">
+      مُصمَّم خصيصاً للسوق السعودي · متوافق مع نظام العمل · بسيط وسريع
+    </p>
+    <div class="feature-row" style="justify-content: center; max-width: 700px; margin: 36px auto 0;">
+      <span class="pill"><span class="gold">🇸🇦</span> سعودي 100%</span>
+      <span class="pill"><span class="gold">⚖️</span> متوافق مع نظام العمل</span>
+      <span class="pill"><span class="gold">📱</span> Web + Android + iOS</span>
+      <span class="pill"><span class="gold">🔐</span> آمن ومشفّر</span>
+    </div>
+    <div class="cover-tag">HR · ATTENDANCE · PAYROLL · COMPLIANCE</div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════ -->
+<!-- SLIDE 2: WHY (Problem → Solution)                    -->
+<!-- ════════════════════════════════════════════════════ -->
+<section class="slide">
+  <span class="slide-number">2 / 16</span>
+  <span class="slide-tag">المشكلة</span>
+  <h2>كل شركة سعودية تواجه نفس<br>المعاناة الإدارية</h2>
+  <p class="lead">إدارة الحضور بالأكسل، تتبع الإقامات يدوياً، حساب الرواتب والـ GOSI كل شهر، إصدار خطابات التعريف بالطلب، متابعة العقود... وقت كثير ضائع وأخطاء مكلفة.</p>
+
+  <div class="grid-4">
+    <div class="card">
+      <div class="card-icon" style="background: linear-gradient(135deg,#94a3b8,#cbd5e1);">📊</div>
+      <h3>أكسل لكل شيء</h3>
+      <p>ملفات متفرقة، نسخ متعددة، وضياع للبيانات</p>
+    </div>
+    <div class="card">
+      <div class="card-icon" style="background: linear-gradient(135deg,#94a3b8,#cbd5e1);">⏰</div>
+      <h3>حضور غير دقيق</h3>
+      <p>لا توجد بصمة موثوقة، تأخر بدون رقابة</p>
+    </div>
+    <div class="card">
+      <div class="card-icon" style="background: linear-gradient(135deg,#94a3b8,#cbd5e1);">⚠️</div>
+      <h3>غرامات GOSI و WPS</h3>
+      <p>أخطاء في الحساب أو تأخر في الإيداع البنكي</p>
+    </div>
+    <div class="card">
+      <div class="card-icon" style="background: linear-gradient(135deg,#94a3b8,#cbd5e1);">📜</div>
+      <h3>إقامات منتهية</h3>
+      <p>اكتشاف الانتهاء بعد فوات الأوان = غرامات</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════ -->
+<!-- SLIDE 3: SOLUTION (4 PILLARS)                        -->
+<!-- ════════════════════════════════════════════════════ -->
+<section class="slide gradient-bg">
+  <div class="pattern" style="color: white;"></div>
+  <div style="position: relative; z-index: 2;">
+    <span class="slide-number" style="background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8);">3 / 16</span>
+    <span class="slide-tag">الحل</span>
+    <h2 style="color: white;">MawaridX يجمع كل شيء<br>في <span class="accent">نظام واحد بسيط</span></h2>
+    <p class="lead">من الموظف الأول إلى الراتب الأخير — كل شيء في مكان واحد، بواجهة عربية واضحة وبدون تعقيد.</p>
+
+    <div class="grid-4">
+      <div class="card" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white;">
+        <div class="card-icon" style="background: linear-gradient(135deg,#fbbf24,#f59e0b);">🇸🇦</div>
+        <h3 style="color: white;">سعودي بالكامل</h3>
+        <p style="color: rgba(255,255,255,0.75);">GOSI · WPS · مكافأة نهاية الخدمة · عطل رسمية · يوم التأسيس</p>
+      </div>
+      <div class="card" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white;">
+        <div class="card-icon" style="background: linear-gradient(135deg,#fbbf24,#f59e0b);">⚡</div>
+        <h3 style="color: white;">بسيط وسريع</h3>
+        <p style="color: rgba(255,255,255,0.75);">واجهة عربية نظيفة، أي موظف يستخدمها بدون تدريب</p>
+      </div>
+      <div class="card" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white;">
+        <div class="card-icon" style="background: linear-gradient(135deg,#fbbf24,#f59e0b);">📦</div>
+        <h3 style="color: white;">شامل</h3>
+        <p style="color: rgba(255,255,255,0.75);">حضور · رواتب · إجازات · تقييمات · توظيف · مستندات</p>
+      </div>
+      <div class="card" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white;">
+        <div class="card-icon" style="background: linear-gradient(135deg,#fbbf24,#f59e0b);">🔐</div>
+        <h3 style="color: white;">آمن وموثوق</h3>
+        <p style="color: rgba(255,255,255,0.75);">2FA · تشفير · نسخ احتياطية تلقائية · حماية من الاختراق</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════ -->
+<!-- SLIDE 4: SAUDI COMPLIANCE                            -->
+<!-- ════════════════════════════════════════════════════ -->
+<section class="slide">
+  <span class="slide-number">4 / 16</span>
+  <span class="slide-tag">التوافق مع الأنظمة السعودية</span>
+  <h2>متوافق مع كل ما تحتاجه<br>المنشأة السعودية قانونياً</h2>
+
+  <div class="grid-3" style="margin-top: 32px;">
+    <div class="card card-emerald">
+      <div class="card-icon">🛡️</div>
+      <h3>التأمينات الاجتماعية (GOSI)</h3>
+      <p>حساب تلقائي لنصيب الموظف وصاحب العمل: <b>9% للسعودي</b> · <b>2% لغير السعودي</b> (أخطار مهنية فقط)</p>
+    </div>
+    <div class="card card-emerald">
+      <div class="card-icon">🏦</div>
+      <h3>WPS — حماية الأجور</h3>
+      <p>تصدير ملف <b>SIF</b> بصيغة مساند جاهز للإيداع البنكي · مع IBAN لكل موظف · شيت قابل للقراءة</p>
+    </div>
+    <div class="card card-emerald">
+      <div class="card-icon">💰</div>
+      <h3>مكافأة نهاية الخدمة</h3>
+      <p>محسوبة تلقائياً وفق نظام العمل السعودي: نصف راتب أول 5 سنوات + كامل بعدها · حالة استقالة وإنهاء</p>
+    </div>
+    <div class="card card-emerald">
+      <div class="card-icon">📅</div>
+      <h3>العطل الرسمية السعودية</h3>
+      <p>تقويم تلقائي: اليوم الوطني · يوم التأسيس · عيد الفطر · عيد الأضحى — لسنوات 2024 / 2025 / 2026</p>
+    </div>
+    <div class="card card-emerald">
+      <div class="card-icon">🪪</div>
+      <h3>تنبيهات الإقامة</h3>
+      <p>تنبيه تلقائي قبل انتهاء الإقامة بفترة محددة · شاشة dashboard خاصة لمتابعة التجديد</p>
+    </div>
+    <div class="card card-emerald">
+      <div class="card-icon">📋</div>
+      <h3>العقود وفترة الإشعار</h3>
+      <p>تتبع تاريخ انتهاء العقد · فترة إشعار 60 يوم تلقائياً · تجديد بنقرة واحدة بإشعار للموظف</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════ -->
+<!-- SLIDE 5: GEOFENCE ATTENDANCE                         -->
+<!-- ════════════════════════════════════════════════════ -->
+<section class="slide">
+  <span class="slide-number">5 / 16</span>
+  <span class="slide-tag">البصمة الجغرافية</span>
+  <h2>بصمة دقيقة بـ <span style="color:#0284c7;">GPS</span><br>لا أحد يستطيع التلاعب</h2>
+  <p class="lead">الموظف يبصم من جواله بشرط أن يكون داخل النطاق الجغرافي للموقع — تُحفظ الإحداثيات تلقائياً مع كل بصمة.</p>
+
+  <div class="split" style="margin-top: 40px;">
+    <div>
+      <ul class="checks">
+        <li><b>تحديد دقيق للنطاق</b> — اختر نقطة الموقع على الخريطة وحدد نصف القطر بالأمتار</li>
+        <li><b>إثبات الموقع تلقائياً</b> — كل بصمة تُسجَّل مع GPS الموظف لحظة البصمة</li>
+        <li><b>منع البصمة من خارج النطاق</b> — رسالة توضح بُعد الموظف بالأمتار</li>
+        <li><b>مرئي على الخريطة</b> — مدير الموارد يرى مواقع البصمات في الوقت الفعلي</li>
+        <li><b>متعدد المواقع لكل شركة</b> — فروع، مستودعات، مواقع مشاريع</li>
+      </ul>
+    </div>
+    <div class="screen">
+      <div class="screen-bar"><span></span><span></span><span></span></div>
+      <div class="screen-body" style="padding: 0;">
+        <div class="map-mock">
+          <div class="geofence" style="top: 50px; right: 100px;"></div>
+          <div class="pin" style="top: 100px; right: 150px;"></div>
+          <div style="position: absolute; bottom: 14px; right: 14px; background: white; padding: 10px 14px; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.1); font-size: 12px;">
+            <div style="font-weight: 700; color: #0f172a;">الفرع الرئيسي</div>
+            <div style="color: #64748b; font-size: 11px;">نطاق البصمة: 200 متر</div>
+            <div style="color: #10b981; font-size: 11px; margin-top: 4px; font-weight: 600;">✓ أنت داخل النطاق</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════ -->
+<!-- SLIDE 6: MULTI-LOCATION                              -->
+<!-- ════════════════════════════════════════════════════ -->
+<section class="slide" style="background: linear-gradient(135deg, #f0f9ff 0%, #fff 100%);">
+  <span class="slide-number">6 / 16</span>
+  <span class="slide-tag">البصمة المتعددة</span>
+  <h2>موظف واحد · بصمة من<br><span style="color:#0284c7;">عدة فروع أو مشاريع</span></h2>
+  <p class="lead">للمندوبين، المشرفين الميدانيين، والمدراء الذين يتنقلون بين المواقع — فعّل خاصية "البصمة المتعددة" واختر له الفروع المسموحة.</p>
+
+  <div class="grid-3" style="margin-top: 40px;">
+    <div class="card">
+      <div class="card-icon">🏢</div>
+      <h3>الفرع الرئيسي</h3>
+      <p>الرياض — حي العليا<br><span style="color: #10b981; font-weight: 600;">✓ مسموح</span></p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🏬</div>
+      <h3>فرع جدة</h3>
+      <p>جدة — كورنيش الشمالي<br><span style="color: #10b981; font-weight: 600;">✓ مسموح</span></p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🚧</div>
+      <h3>موقع المشروع</h3>
+      <p>الدمام — منطقة صناعية<br><span style="color: #10b981; font-weight: 600;">✓ مسموح</span></p>
+    </div>
+  </div>
+
+  <p style="margin-top: 32px; color: #64748b; font-size: 15px; max-width: 700px;">
+    <b>ميزة:</b> الموظف نفسه يبصم من أي موقع مسموح. النظام يسجّل تلقائياً موقع الدخول وموقع الخروج بشكل منفصل.
+  </p>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════ -->
+<!-- SLIDE 7: WORKING HOURS & SHIFTS                      -->
+<!-- ════════════════════════════════════════════════════ -->
+<section class="slide">
+  <span class="slide-number">7 / 16</span>
+  <span class="slide-tag">ساعات العمل والشيفتات</span>
+  <h2>إدارة كاملة للدوام<br><span style="color:#0284c7;">ثابت أو مرن أو شيفتات</span></h2>
+
+  <div class="split" style="margin-top: 40px;">
+    <div>
+      <h3 style="color: #0284c7; margin-bottom: 20px;">3 أنماط متاحة:</h3>
+      <ul class="checks">
+        <li><b>دوام ثابت</b> — وقت دخول وخروج محدد + مهلة تأخير قابلة للتعديل (مثلاً 15 دقيقة)</li>
+        <li><b>دوام مرن</b> — عدد ساعات يومية مطلوبة فقط (مثلاً 8 ساعات) — مناسب للوظائف الإدارية</li>
+        <li><b>شيفتات</b> — صباحي / مسائي / ليلي — لكل شيفت أيام عمل وألوان مميزة</li>
+        <li><b>حساب التأخير تلقائي</b> — حسب شيفت الموظف وليس وقت موحد</li>
+        <li><b>الإضافي تلقائي</b> — الفرق بين الخروج الفعلي ووقت نهاية الشيفت</li>
+        <li><b>ربط مع الرواتب</b> — التأخير الزائد عن المهلة يُحسب في الراتب</li>
+      </ul>
+    </div>
+    <div class="screen">
+      <div class="screen-bar"><span></span><span></span><span></span></div>
+      <div class="screen-body">
+        <div style="display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 12px; background: #f8fafc; border-right: 4px solid #0284c7; margin-bottom: 10px;">
+          <div style="width: 38px; height: 38px; border-radius: 10px; background: #e0f2fe; display: flex; align-items: center; justify-content: center;">⏰</div>
+          <div style="flex: 1;">
+            <div style="font-weight: 700; font-size: 14px;">شيفت صباحي</div>
+            <div style="font-size: 12px; color: #64748b; font-family: monospace;">08:00 → 17:00 · 8 ساعات</div>
+          </div>
+          <span class="badge badge-sky">14 موظف</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 12px; background: #f8fafc; border-right: 4px solid #f59e0b; margin-bottom: 10px;">
+          <div style="width: 38px; height: 38px; border-radius: 10px; background: #fef3c7; display: flex; align-items: center; justify-content: center;">🌆</div>
+          <div style="flex: 1;">
+            <div style="font-weight: 700; font-size: 14px;">شيفت مسائي</div>
+            <div style="font-size: 12px; color: #64748b; font-family: monospace;">14:00 → 22:00 · 8 ساعات</div>
+          </div>
+          <span class="badge badge-amber">8 موظف</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 12px; background: #f8fafc; border-right: 4px solid #7c3aed;">
+          <div style="width: 38px; height: 38px; border-radius: 10px; background: #ede9fe; display: flex; align-items: center; justify-content: center;">🌙</div>
+          <div style="flex: 1;">
+            <div style="font-weight: 700; font-size: 14px;">شيفت ليلي</div>
+            <div style="font-size: 12px; color: #64748b; font-family: monospace;">22:00 → 06:00 · 8 ساعات</div>
+          </div>
+          <span class="badge" style="background: #ede9fe; color: #5b21b6;">3 موظف</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════ -->
+<!-- SLIDE 8: IQAMA & CONTRACT TRACKING                   -->
+<!-- ════════════════════════════════════════════════════ -->
+<section class="slide gradient-bg">
+  <div class="pattern" style="color: white;"></div>
+  <div style="position: relative; z-index: 2;">
+    <span class="slide-number" style="background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8);">8 / 16</span>
+    <span class="slide-tag">التنبيهات الذكية</span>
+    <h2 style="color: white;">لا تكتشف انتهاء<br>الإقامة <span class="accent">بعد فوات الأوان</span></h2>
+    <p class="lead">شاشة dashboard مخصصة تُظهر كل الإقامات والعقود التي تنتهي خلال 30 / 60 / 90 يوم — مع خيار التجديد بنقرة واحدة.</p>
+
+    <div class="grid-3" style="margin-top: 40px;">
+      <div class="card" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white;">
+        <h3 style="color: white;">🪪 إقامات تقترب من الانتهاء</h3>
+        <table class="mock-table" style="margin-top: 14px; color: white;">
+          <tr><td style="border-color: rgba(255,255,255,0.15); color: white;">محمد ع. — EMP0042</td><td style="border-color: rgba(255,255,255,0.15);"><span class="badge badge-rose">12 يوم</span></td></tr>
+          <tr><td style="border-color: rgba(255,255,255,0.15); color: white;">أحمد ج. — EMP0078</td><td style="border-color: rgba(255,255,255,0.15);"><span class="badge badge-amber">28 يوم</span></td></tr>
+          <tr><td style="border-color: transparent; color: white;">سامي ر. — EMP0103</td><td style="border-color: transparent;"><span class="badge badge-amber">45 يوم</span></td></tr>
+        </table>
+      </div>
+      <div class="card" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white;">
+        <h3 style="color: white;">📋 عقود تحتاج تجديد</h3>
+        <table class="mock-table" style="margin-top: 14px; color: white;">
+          <tr><td style="border-color: rgba(255,255,255,0.15); color: white;">خالد ف.</td><td style="border-color: rgba(255,255,255,0.15);"><span class="badge badge-rose">في فترة الإشعار</span></td></tr>
+          <tr><td style="border-color: rgba(255,255,255,0.15); color: white;">فهد ق.</td><td style="border-color: rgba(255,255,255,0.15);"><span class="badge badge-amber">38 يوم</span></td></tr>
+          <tr><td style="border-color: transparent; color: white;">عمر ل.</td><td style="border-color: transparent;"><span class="badge badge-sky">90 يوم</span></td></tr>
+        </table>
+      </div>
+      <div class="card" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white;">
+        <h3 style="color: white;">📄 وثائق منتهية</h3>
+        <table class="mock-table" style="margin-top: 14px; color: white;">
+          <tr><td style="border-color: rgba(255,255,255,0.15); color: white;">رخصة قيادة</td><td style="border-color: rgba(255,255,255,0.15);"><span class="badge badge-rose">منتهية</span></td></tr>
+          <tr><td style="border-color: rgba(255,255,255,0.15); color: white;">شهادة طبية</td><td style="border-color: rgba(255,255,255,0.15);"><span class="badge badge-amber">5 أيام</span></td></tr>
+          <tr><td style="border-color: transparent; color: white;">جواز سفر</td><td style="border-color: transparent;"><span class="badge badge-amber">21 يوم</span></td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════ -->
+<!-- SLIDE 9: DOCUMENTS                                    -->
+<!-- ════════════════════════════════════════════════════ -->
+<section class="slide">
+  <span class="slide-number">9 / 16</span>
+  <span class="slide-tag">إدارة المستندات</span>
+  <h2>وثائق آمنة ومنظمة<br><span style="color:#0284c7;">بصلاحيات حسب القسم</span></h2>
+
+  <div class="grid-2">
+    <div class="card card-violet">
+      <div class="card-icon">👤</div>
+      <h3>وثائق الموظفين</h3>
+      <p style="margin-bottom: 16px;">هويات، إقامات، جوازات، عقود، شهادات، تقارير طبية — مرفوعة لملف كل موظف</p>
+      <ul class="checks">
+        <li>تنبيهات انتهاء الصلاحية تلقائياً</li>
+        <li>عرض، تحميل، أو حذف بنقرة</li>
+        <li>تشفير وآمنة من التسريب</li>
+      </ul>
+    </div>
+    <div class="card card-violet">
+      <div class="card-icon">📂</div>
+      <h3>مستندات الشركة</h3>
+      <p style="margin-bottom: 16px;">سياسات، لوائح، نماذج، عقود، تنظيمات — موزعة بصلاحيات دقيقة</p>
+      <ul class="checks">
+        <li><b>للجميع</b> — يصل لها كل الموظفين</li>
+        <li><b>لقسم محدد</b> — قسم المبيعات فقط مثلاً</li>
+        <li><b>لمدراء فقط</b> — للسياسات الإدارية</li>
+        <li><b>لموظفين بالاسم</b> — وثائق سرية</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="screen" style="margin-top: 36px;">
+    <div class="screen-bar"><span></span><span></span><span></span></div>
+    <div class="screen-body">
+      <table class="mock-table">
+        <thead>
+          <tr><th>المستند</th><th>الفئة</th><th>الصلاحية</th><th>تاريخ الانتهاء</th><th>التحميلات</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>📋 لائحة العمل الداخلية</td><td>سياسة</td><td><span class="badge badge-sky">للجميع</span></td><td>—</td><td>42 تحميل</td></tr>
+          <tr><td>📄 نموذج طلب إجازة</td><td>نموذج</td><td><span class="badge badge-sky">للجميع</span></td><td>—</td><td>156 تحميل</td></tr>
+          <tr><td>🔒 سياسة الراتب والمكافآت</td><td>سياسة</td><td><span class="badge" style="background:#fef3c7;color:#92400e;">للمدراء فقط</span></td><td>2026-12-31</td><td>8 تحميل</td></tr>
+          <tr><td>🛡️ شهادة الجودة ISO</td><td>شهادة</td><td><span class="badge" style="background:#e0e7ff;color:#3730a3;">قسم المبيعات</span></td><td>2026-08-15</td><td>23 تحميل</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════ -->
+<!-- SLIDE 10: PAYROLL & WPS                              -->
+<!-- ════════════════════════════════════════════════════ -->
+<section class="slide">
+  <span class="slide-number">10 / 16</span>
+  <span class="slide-tag">الرواتب</span>
+  <h2>توليد الرواتب الشهرية<br><span style="color:#0284c7;">بنقرة واحدة</span></h2>
+
+  <div class="split" style="margin-top: 40px;">
+    <div>
+      <ul class="checks">
+        <li><b>توليد جماعي</b> — كل موظفي الشركة في نقرة</li>
+        <li><b>GOSI تلقائي</b> — حسب جنسية كل موظف</li>
+        <li><b>بدلات شاملة</b> — سكن، نقل، بدلات أخرى</li>
+        <li><b>خصومات تلقائية</b> — قواعد ثابتة (سلف، تأمين) + جزاءات شهرية</li>
+        <li><b>أقساط ذكية</b> — السلفة على X شهر، تتوقف تلقائياً</li>
+        <li><b>تصدير WPS</b> — ملف SIF جاهز للبنك</li>
+        <li><b>تصدير Excel</b> — لكل المحاسبين والمراجعين</li>
+        <li><b>قسائم رواتب</b> — للموظف في بوابته</li>
+      </ul>
+    </div>
+    <div class="screen">
+      <div class="screen-bar"><span></span><span></span><span></span></div>
+      <div class="screen-body" style="padding: 16px;">
+        <div style="background: #f0f9ff; padding: 16px; border-radius: 12px; border: 1px solid #bae6fd;">
+          <div style="font-size: 12px; color: #075985; font-weight: 700; margin-bottom: 4px;">راتب أكتوبر 2026 — أحمد عبدالله</div>
+          <table style="width: 100%; font-size: 13px; margin-top: 12px;">
+            <tr><td style="color: #475569; padding: 4px 0;">الراتب الأساسي</td><td style="text-align: left; font-family: monospace;">8,000.00</td></tr>
+            <tr><td style="color: #475569; padding: 4px 0;">بدل سكن</td><td style="text-align: left; font-family: monospace;">+1,500.00</td></tr>
+            <tr><td style="color: #475569; padding: 4px 0;">بدل نقل</td><td style="text-align: left; font-family: monospace;">+500.00</td></tr>
+            <tr><td style="color: #dc2626; padding: 4px 0;">GOSI (9%)</td><td style="text-align: left; font-family: monospace; color: #dc2626;">-720.00</td></tr>
+            <tr><td style="color: #dc2626; padding: 4px 0;">جزاء تأخر</td><td style="text-align: left; font-family: monospace; color: #dc2626;">-200.00</td></tr>
+            <tr style="border-top: 2px solid #0284c7;"><td style="padding: 10px 0; font-weight: 800; color: #0284c7;">الصافي</td><td style="text-align: left; font-family: monospace; font-weight: 800; color: #0284c7;">9,080.00 ر.س</td></tr>
+          </table>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
+          <button style="flex: 1; padding: 10px; border-radius: 10px; background: #0284c7; color: white; border: none; font-weight: 700; font-size: 12px;">📥 WPS SIF</button>
+          <button style="flex: 1; padding: 10px; border-radius: 10px; background: #f1f5f9; color: #0f172a; border: none; font-weight: 600; font-size: 12px;">📊 Excel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════ -->
+<!-- SLIDE 11: SELF-SERVICE PORTAL                        -->
+<!-- ════════════════════════════════════════════════════ -->
+<section class="slide" style="background: linear-gradient(135deg, #fff 0%, #f0f9ff 100%);">
+  <span class="slide-number">11 / 16</span>
+  <span class="slide-tag">بوابة الموظف</span>
+  <h2>كل موظف عنده بوابته<br><span style="color:#0284c7;">يخدم نفسه بنفسه</span></h2>
+  <p class="lead">قلل ضغط طلبات الموارد البشرية بنسبة 80% — الموظف يقدم طلباته، يبصم، يطلع راتبه، يطلب إجازة... كل هذا من جواله.</p>
+
+  <div class="grid-4">
+    <div class="card"><div class="card-icon">📅</div><h3>طلب إجازة</h3><p>سنوية، مرضية، طارئة، أمومة — يعرف رصيده فوراً</p></div>
+    <div class="card"><div class="card-icon">💵</div><h3>طلب سلفة</h3><p>يحدد المبلغ وعدد الأقساط، تخصم تلقائياً من الراتب</p></div>
+    <div class="card"><div class="card-icon">📍</div><h3>البصمة بـ GPS</h3><p>دخول/خروج من الموبايل بدون أجهزة بصمة</p></div>
+    <div class="card"><div class="card-icon">📄</div><h3>طلب خطاب تعريف</h3><p>راتب، توظيف، خبرة — جاهز PDF فوراً</p></div>
+    <div class="card"><div class="card-icon">📋</div><h3>عرض الراتب</h3><p>قسيمة شهرية تفصيلية + الإضافي والخصم</p></div>
+    <div class="card"><div class="card-icon">📦</div><h3>عرض العهد</h3><p>الأجهزة، الأدوات، تذاكر السفر المستلمة</p></div>
+    <div class="card"><div class="card-icon">📂</div><h3>وثائقي</h3><p>الوثائق المتاحة لي + سياسات الشركة</p></div>
+    <div class="card"><div class="card-icon">🔔</div><h3>إشعارات</h3><p>موافقة طلب، إعلانات، تنبيهات</p></div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════ -->
+<!-- SLIDE 12: ONBOARDING / OFFBOARDING                   -->
+<!-- ════════════════════════════════════════════════════ -->
+<section class="slide">
+  <span class="slide-number">12 / 16</span>
+  <span class="slide-tag">الاستقبال والمغادرة</span>
+  <h2>قوائم مهام تلقائية<br><span style="color:#0284c7;">للاستقبال والمغادرة</span></h2>
+  <p class="lead">عند إضافة موظف جديد أو إنهاء خدمته — تظهر قائمة مهام كاملة موزعة على HR و IT والمدير المباشر.</p>
+
+  <div class="grid-2">
+    <div class="card card-emerald">
+      <div class="card-icon">👋</div>
+      <h3>استقبال موظف جديد (Onboarding)</h3>
+      <ul class="checks" style="margin-top: 12px;">
+        <li>استلام عقد العمل الموقع — HR</li>
+        <li>رفع بيانات GOSI — HR</li>
+        <li>إعداد بريد العمل — IT</li>
+        <li>تسليم الجهاز والأدوات — IT</li>
+        <li>التعريف بالفريق — المدير</li>
+        <li>شرح سياسات الشركة — HR</li>
+        <li>فتح حساب بنكي — الموظف</li>
+      </ul>
+    </div>
+    <div class="card card-rose">
+      <div class="card-icon">🚪</div>
+      <h3>مغادرة موظف (Offboarding)</h3>
+      <ul class="checks" style="margin-top: 12px;">
+        <li>تسليم الجهاز والأدوات — IT</li>
+        <li>إلغاء الصلاحيات — IT</li>
+        <li>تسوية المستحقات — HR</li>
+        <li>تسوية أيام الإجازة المتبقية — HR</li>
+        <li>تحديث GOSI — HR</li>
+        <li>إصدار شهادة الخبرة — HR</li>
+        <li>مقابلة الخروج — المدير</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════ -->
+<!-- SLIDE 13: RECRUITMENT & PERFORMANCE                  -->
+<!-- ════════════════════════════════════════════════════ -->
+<section class="slide">
+  <span class="slide-number">13 / 16</span>
+  <span class="slide-tag">التطوير والنمو</span>
+  <h2>إدارة كاملة لدورة حياة<br>الموظف من التوظيف للتقاعد</h2>
+
+  <div class="grid-3" style="margin-top: 32px;">
+    <div class="card card-gold">
+      <div class="card-icon">🎯</div>
+      <h3>التوظيف</h3>
+      <p>إدارة الوظائف الشاغرة، استقبال السير الذاتية، تحديد مواعيد المقابلات، وتتبع المتقدمين</p>
+    </div>
+    <div class="card card-gold">
+      <div class="card-icon">⭐</div>
+      <h3>تقييم الأداء</h3>
+      <p>تقييمات دورية بأسئلة مخصصة، نتائج رقمية وتقديرات، نقاط القوة وأهداف التطوير</p>
+    </div>
+    <div class="card card-gold">
+      <div class="card-icon">📚</div>
+      <h3>التدريب</h3>
+      <p>إدارة البرامج التدريبية، تسجيل الموظفين، تتبع الإنجاز، وإصدار الشهادات</p>
+    </div>
+    <div class="card card-rose">
+      <div class="card-icon">⚠️</div>
+      <h3>الجزاءات والإنذارات</h3>
+      <p>إنذار شفهي / كتابي / نهائي، خصم مالي تلقائي من الراتب، وقف عن العمل</p>
+    </div>
+    <div class="card card-violet">
+      <div class="card-icon">🌳</div>
+      <h3>الهيكل التنظيمي</h3>
+      <p>عرض شجري تفاعلي للمدراء والمرؤوسين، تحديد المدير المباشر تلقائياً حسب القسم</p>
+    </div>
+    <div class="card card-violet">
+      <div class="card-icon">📊</div>
+      <h3>تقارير وتحليلات</h3>
+      <p>إحصائيات الحضور، الإجازات، الرواتب، الجزاءات — قابلة للتصدير Excel</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════ -->
+<!-- SLIDE 14: MOBILE APP                                 -->
+<!-- ════════════════════════════════════════════════════ -->
+<section class="slide gradient-bg">
+  <div class="pattern" style="color: white;"></div>
+  <div style="position: relative; z-index: 2;">
+    <span class="slide-number" style="background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8);">14 / 16</span>
+    <span class="slide-tag">تطبيق الموبايل</span>
+    <h2 style="color: white;">تطبيق رسمي على<br><span class="accent">Android & iOS</span></h2>
+    <p class="lead">تطبيق المنشأة باسمها وشعارها على المتاجر — موظفوك يحملون "تطبيق شركتك"، ليس "تطبيق MawaridX".</p>
+
+    <div class="grid-3" style="margin-top: 40px;">
+      <div class="card" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white;">
+        <div class="card-icon" style="background: linear-gradient(135deg,#fbbf24,#f59e0b);">🤖</div>
+        <h3 style="color: white;">Android — Google Play</h3>
+        <p style="color: rgba(255,255,255,0.75);">APK جاهز للتوزيع داخلياً أو نشر على Google Play بحساب الشركة</p>
+      </div>
+      <div class="card" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white;">
+        <div class="card-icon" style="background: linear-gradient(135deg,#fbbf24,#f59e0b);">🍎</div>
+        <h3 style="color: white;">iOS — App Store</h3>
+        <p style="color: rgba(255,255,255,0.75);">تطبيق iOS كامل مع دعم الإشعارات الفورية بحساب Apple Developer</p>
+      </div>
+      <div class="card" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white;">
+        <div class="card-icon" style="background: linear-gradient(135deg,#fbbf24,#f59e0b);">🔔</div>
+        <h3 style="color: white;">إشعارات Push</h3>
+        <p style="color: rgba(255,255,255,0.75);">موافقة الإجازة، إعلانات الشركة، تذكيرات البصمة — تصل فوراً للجوال</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════ -->
+<!-- SLIDE 15: SECURITY                                    -->
+<!-- ════════════════════════════════════════════════════ -->
+<section class="slide">
+  <span class="slide-number">15 / 16</span>
+  <span class="slide-tag">الأمان وحماية البيانات</span>
+  <h2>أمان على مستوى<br><span style="color:#0284c7;">الشركات الكبرى</span></h2>
+  <p class="lead">بيانات موظفيك ومعلومات الرواتب من أهم أصول شركتك — MawaridX يحميها بمعايير عالمية.</p>
+
+  <div class="grid-3" style="margin-top: 40px;">
+    <div class="card card-rose">
+      <div class="card-icon">🔐</div>
+      <h3>تحقق ثنائي (2FA)</h3>
+      <p>رمز OTP بالإيميل عند تسجيل دخول الإدارة — حماية إضافية ضد سرقة كلمات المرور</p>
+    </div>
+    <div class="card card-rose">
+      <div class="card-icon">🚫</div>
+      <h3>حماية ضد الاختراق</h3>
+      <p>Rate Limiting يمنع محاولات تخمين كلمات المرور — حظر تلقائي بعد 5 محاولات</p>
+    </div>
+    <div class="card card-rose">
+      <div class="card-icon">🔒</div>
+      <h3>تشفير الجلسات</h3>
+      <p>كل جلسة دخول مشفّرة بـ JWT — لا يمكن التلاعب بالصلاحيات أو انتحال هوية مستخدم</p>
+    </div>
+    <div class="card card-emerald">
+      <div class="card-icon">💾</div>
+      <h3>نسخ احتياطية تلقائية</h3>
+      <p>نسخة كل 24 ساعة + يدوي بنقرة — احتفاظ بآخر 14 نسخة + تحميل وتنزيل بالكامل</p>
+    </div>
+    <div class="card card-emerald">
+      <div class="card-icon">📋</div>
+      <h3>سجل تدقيق كامل</h3>
+      <p>كل تعديل، كل موافقة، كل دخول — موثّق مع التاريخ والمستخدم — للمراجعات والامتثال</p>
+    </div>
+    <div class="card card-emerald">
+      <div class="card-icon">🛡️</div>
+      <h3>عزل بيانات الشركات</h3>
+      <p>كل شركة في حاوية مستقلة بقاعدة بيانات منفصلة — لا تختلط البيانات أبداً</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════ -->
+<!-- SLIDE 16: SIMPLICITY + CTA                           -->
+<!-- ════════════════════════════════════════════════════ -->
+<section class="slide gradient-bg">
+  <div class="pattern" style="color: white;"></div>
+  <div style="position: relative; z-index: 2; text-align: center; max-width: 900px; margin: 0 auto;">
+    <span class="slide-number" style="background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8);">16 / 16</span>
+    <span class="slide-tag" style="margin-bottom: 24px;">البساطة في كل شيء</span>
+
+    <div class="quote" style="color: white; font-size: 38px;">
+      "نظام مصمَّم ليُستخدم<br>وليس ليُتعلَّم."
+    </div>
+    <p class="lead" style="color: rgba(255,255,255,0.85); margin: 0 auto 50px;">
+      لا تحتاج تدريب. لا تحتاج دليل استخدام. واجهة عربية واضحة، أيقونات مفهومة، وكل عملية في ثوانٍ.
+    </p>
+
+    <div class="grid-4" style="max-width: 800px; margin: 0 auto 60px;">
+      <div class="stat" style="background: rgba(255,255,255,0.1); border-radius: 16px;">
+        <div class="stat-num" style="color: #fbbf24;">3</div>
+        <div class="stat-label" style="color: rgba(255,255,255,0.8);">دقائق لإضافة موظف</div>
+      </div>
+      <div class="stat" style="background: rgba(255,255,255,0.1); border-radius: 16px;">
+        <div class="stat-num" style="color: #fbbf24;">1</div>
+        <div class="stat-label" style="color: rgba(255,255,255,0.8);">نقرة لتوليد الرواتب</div>
+      </div>
+      <div class="stat" style="background: rgba(255,255,255,0.1); border-radius: 16px;">
+        <div class="stat-num" style="color: #fbbf24;">200</div>
+        <div class="stat-label" style="color: rgba(255,255,255,0.8);">موظف برفع Excel واحد</div>
+      </div>
+      <div class="stat" style="background: rgba(255,255,255,0.1); border-radius: 16px;">
+        <div class="stat-num" style="color: #fbbf24;">0</div>
+        <div class="stat-label" style="color: rgba(255,255,255,0.8);">تكلفة إضافية مخفية</div>
+      </div>
+    </div>
+
+    <h2 style="color: white; font-size: 56px; margin-bottom: 20px;">
+      جاهز <span class="accent">لتجربة MawaridX؟</span>
+    </h2>
+    <p class="lead" style="color: rgba(255,255,255,0.85); margin: 0 auto 40px;">
+      احجز عرضاً تجريبياً وشاهد كيف يمكن للنظام أن يوفر ساعات من العمل اليدوي شهرياً.
+    </p>
+
+    <div class="feature-row" style="justify-content: center;">
+      <span class="pill" style="background: #fbbf24; color: #0c4a6e; font-size: 16px; padding: 14px 28px; border: none;">📞 احجز عرضاً تجريبياً</span>
+      <span class="pill" style="font-size: 16px; padding: 14px 28px;">📧 sales@mawaridx.com</span>
+    </div>
+
+    <div style="margin-top: 60px; color: rgba(255,255,255,0.5); font-size: 13px; letter-spacing: 3px; font-weight: 600;">
+      MAWARIDX · صُنع في المملكة العربية السعودية 🇸🇦
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
