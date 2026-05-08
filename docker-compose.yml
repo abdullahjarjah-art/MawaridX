@@ -53,13 +53,18 @@ services:
     healthcheck: *healthcheck
 
   # ────────── Reverse Proxy (only host-exposed service) ──────────
+  # Host-side ports: 8081 → :80, 8443 → :443. The non-standard 8081
+  # avoids clashing with another reverse proxy (traefik) on the same
+  # VPS that owns :80. Update the customer-facing URL accordingly:
+  # https://hr.mawaridx.com is fronted by an external proxy/CDN that
+  # forwards to <vps-ip>:8081, OR users hit http://<vps-ip>:8081 directly.
   nginx:
     image: nginx:1.27-alpine
     container_name: mawaridx-nginx
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "8081:80"
+      - "8443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
