@@ -32,9 +32,13 @@ RUN apk add --no-cache libc6-compat openssl python3 make g++
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# node_modules already includes the generated Prisma client from deps
+# node_modules already includes Prisma's runtime; src/generated/prisma is
+# produced by `prisma generate` and is gitignored, so it does NOT arrive
+# via `COPY . .`. Regenerate inside this stage so the import
+# `@/generated/prisma/client` in src/lib/prisma.ts resolves.
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN npx prisma generate
 
 # Build Next.js (uses standalone output — see next.config.ts)
 RUN npm run build
