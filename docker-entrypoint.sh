@@ -22,15 +22,19 @@ fi
 # Run migrations only if a migrations directory exists in the image.
 # `migrate deploy` is the production-safe command — it never prompts,
 # never resets the DB, and only applies committed migrations.
+#
+# Prisma 7 reads `datasource.url` from prisma.config.ts (not schema.prisma),
+# and removed the `--skip-generate` flag from `db push`. Both commands now
+# use the config file's URL automatically.
 if [ -d "./prisma/migrations" ] && [ -n "$(ls -A ./prisma/migrations 2>/dev/null)" ]; then
   echo "[entrypoint] Applying Prisma migrations..."
   node "${PRISMA_CLI}" migrate deploy --schema=./prisma/schema.prisma || {
     echo "[entrypoint] migrate deploy failed — falling back to db push (first-run scenario)"
-    node "${PRISMA_CLI}" db push --schema=./prisma/schema.prisma --skip-generate
+    node "${PRISMA_CLI}" db push --schema=./prisma/schema.prisma --accept-data-loss
   }
 else
   echo "[entrypoint] No migrations dir found — running db push (development schema sync)"
-  node "${PRISMA_CLI}" db push --schema=./prisma/schema.prisma --skip-generate
+  node "${PRISMA_CLI}" db push --schema=./prisma/schema.prisma --accept-data-loss
 fi
 
 echo "[entrypoint] Database ready. Launching application..."

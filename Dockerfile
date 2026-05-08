@@ -71,6 +71,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/public           ./public
 # first-run migrations with "Cannot find module 'effect'". Trading ~50 MB
 # of image size for a node_modules that does not silently miss deps.
 COPY --from=builder --chown=nextjs:nodejs /app/prisma                          ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts                ./prisma.config.ts
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules                    ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/src/generated                   ./src/generated
 
