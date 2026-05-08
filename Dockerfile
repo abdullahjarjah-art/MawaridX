@@ -5,7 +5,7 @@
 # ──────────────────────────────────────────────────────────
 
 # ============ Stage 1: deps (install + generate Prisma client) ============
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
 
 # better-sqlite3 + Prisma engines need build tools BEFORE npm ci runs.
@@ -23,7 +23,7 @@ RUN npm ci --no-audit --no-fund
 RUN npx prisma generate
 
 # ============ Stage 2: builder (compile Next.js) ============
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Same toolchain — Next.js build may invoke native compilers
@@ -40,7 +40,7 @@ COPY . .
 RUN npm run build
 
 # ============ Stage 3: runner (minimal final image) ============
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
