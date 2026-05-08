@@ -61,11 +61,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static    ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public           ./public
 
-# Prisma assets needed at runtime: schema + migrations + generated client + native binaries
+# Prisma assets needed at runtime: schema + migrations + generated client + native binaries.
+# NOTE: Prisma 7 with custom `output = "../src/generated/prisma"` does NOT
+# create node_modules/.prisma anymore — the generated client lives at
+# src/generated/prisma/* and is copied below. Do not re-add the .prisma copy.
 COPY --from=builder --chown=nextjs:nodejs /app/prisma                  ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma          ./node_modules/@prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma           ./node_modules/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma          ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/better-sqlite3   ./node_modules/better-sqlite3
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/bindings         ./node_modules/bindings
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/file-uri-to-path ./node_modules/file-uri-to-path
