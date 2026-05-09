@@ -52,12 +52,13 @@ services:
       - company-a-backups:/app/backups
     healthcheck: *healthcheck
 
-  # ────────── Reverse Proxy (only host-exposed service) ──────────
-  # Host-side ports: 8081 → :80, 8443 → :443. The non-standard 8081
-  # avoids clashing with another reverse proxy (traefik) on the same
-  # VPS that owns :80. Update the customer-facing URL accordingly:
-  # https://hr.mawaridx.com is fronted by an external proxy/CDN that
-  # forwards to <vps-ip>:8081, OR users hit http://<vps-ip>:8081 directly.
+  # ────────── Reverse Proxy ──────────
+  # External traffic is fronted by a separate Traefik container running
+  # on the VPS host network. Traefik discovers this service via the
+  # `traefik.*` labels below and proxies https://mawaridx.com to it,
+  # auto-issuing a Let's Encrypt cert. Host ports 8081/8443 are kept
+  # for direct (untrusted) HTTP testing — drop them once Traefik is
+  # confirmed working.
   nginx:
     image: nginx:1.27-alpine
     container_name: mawaridx-nginx
@@ -73,6 +74,13 @@ services:
       - mawaridx-internal
     depends_on:
       - hr-company-a
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=mawaridx_mawaridx-internal"
+      - "traefik.http.routers.mawaridx.rule=Host(`mawaridx.com`) || Host(`www.mawaridx.com`)"
+      - "traefik.http.routers.mawaridx.entrypoints=websecure"
+      - "traefik.http.routers.mawaridx.tls.certresolver=letsencrypt"
+      - "traefik.http.services.mawaridx.loadbalancer.server.port=80"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
       interval: 30s
