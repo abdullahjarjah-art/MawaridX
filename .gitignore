@@ -45,6 +45,11 @@ next-env.d.ts
 /src/generated/prisma
 
 # قاعدة البيانات (تحتوي بيانات حساسة — لا ترفعها)
+/data/*.db
+/data/*.db-journal
+/data/*.db-shm
+/data/*.db-wal
+# Legacy locations (kept ignored in case any local DB still lives there)
 /prisma/*.db
 /prisma/*.db-journal
 /prisma/*.db-shm
