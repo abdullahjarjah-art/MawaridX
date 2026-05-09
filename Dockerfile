@@ -79,9 +79,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/src/generated                   .
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Persistent storage targets (mounted from compose)
-RUN mkdir -p /app/prisma /app/backups /app/public/uploads \
- && chown -R nextjs:nodejs /app/prisma /app/backups /app/public/uploads
+# Persistent storage targets (mounted from compose).
+# /app/data holds the SQLite DB — kept SEPARATE from /app/prisma so the
+# volume mount does not mask schema.prisma / migrations baked into the image.
+RUN mkdir -p /app/data /app/backups /app/public/uploads \
+ && chown -R nextjs:nodejs /app/data /app/prisma /app/backups /app/public/uploads
 
 USER nextjs
 

@@ -6,6 +6,8 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: "file:./prisma/hr.db",
+    // DB lives outside prisma/ so the volume mount in production
+    // (data/) does not mask the schema/migrations files in prisma/.
+    url: "file:./data/hr.db",
   },
 });

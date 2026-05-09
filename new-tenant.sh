@@ -18,14 +18,15 @@ cd "$TARGET_DIR"
 
 # 2. إنشاء قاعدة بيانات جديدة فارغة
 echo "🗄️  إنشاء قاعدة بيانات جديدة..."
-rm -f prisma/hr.db
+mkdir -p data
+rm -f data/hr.db
 npx prisma db push --skip-generate
 
 # 3. إنشاء مستخدم HR
 node -e "
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
-const db = new Database('./prisma/hr.db');
+const db = new Database('./data/hr.db');
 const hash = bcrypt.hashSync('Admin@123', 10);
 const id = 'hr_' + Date.now();
 db.prepare(\`

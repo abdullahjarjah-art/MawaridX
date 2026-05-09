@@ -9,6 +9,20 @@ set -e
 echo "[entrypoint] MawaridX container starting..."
 echo "[entrypoint] DATABASE_URL=${DATABASE_URL}"
 
+# ── One-shot legacy DB migration ─────────────────────────────────────
+# Older deployments mounted the volume at /app/prisma, which masked
+# schema.prisma. We now mount at /app/data. If an operator follows the
+# upgrade procedure (mount the OLD volume temporarily at /app/legacy-db
+# during a one-time boot), this block copies the DB into the new layout.
+if [ -f "/app/legacy-db/hr.db" ] && [ ! -f "/app/data/hr.db" ]; then
+  echo "[entrypoint] Migrating legacy DB from /app/legacy-db/ → /app/data/"
+  cp /app/legacy-db/hr.db     /app/data/hr.db
+  cp /app/legacy-db/hr.db-shm /app/data/hr.db-shm 2>/dev/null || true
+  cp /app/legacy-db/hr.db-wal /app/data/hr.db-wal 2>/dev/null || true
+  echo "[entrypoint] Legacy DB migration complete."
+fi
+mkdir -p /app/data
+
 # Call the Prisma CLI via its package entry point directly to avoid
 # any reliance on node_modules/.bin/ symlinks (which can be brittle
 # inside multi-stage Docker images).

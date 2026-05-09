@@ -13,7 +13,7 @@ x-app-env: &app-env
   NODE_ENV: production
   NEXT_TELEMETRY_DISABLED: "1"
   PORT: "3000"
-  DATABASE_URL: "file:./prisma/hr.db"
+  DATABASE_URL: "file:./data/hr.db"
   JWT_SECRET: ${JWT_SECRET}
   SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS}
   BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
@@ -47,7 +47,9 @@ services:
       COMPANY_PLAN: ${COMPANY_A_PLAN:-trial}
       NEXT_PUBLIC_APP_URL: ${COMPANY_A_URL}
     volumes:
-      - company-a-db:/app/prisma
+      # DB volume mounts /app/data ONLY — leaves prisma/schema.prisma and
+      # prisma/migrations in the image so schema changes redeploy correctly.
+      - company-a-db:/app/data
       - company-a-uploads:/app/public/uploads
       - company-a-backups:/app/backups
     healthcheck: *healthcheck
