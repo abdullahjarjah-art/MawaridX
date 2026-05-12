@@ -5,83 +5,119 @@ import { getSession } from "@/lib/auth";
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
+
   const { searchParams } = new URL(req.url);
   const year = Number(searchParams.get("year") || new Date().getFullYear());
+  const yearStart = new Date(year, 0, 1);
+  const yearEnd   = new Date(year + 1, 0, 1);
 
-  // إحصائيات الحضور الشهرية
-  const attendance = await prisma.attendance.findMany({
-    where: {
-      date: {
-        gte: new Date(year, 0, 1),
-        lt: new Date(year + 1, 0, 1),
-      },
-    },
-    select: { date: true, status: true, checkIn: true },
-  });
+  // ── تشغيل كل الاستعلامات بالتوازي ──
+  const [
+    attendanceByStatus,
+    attendanceLateCheckIns,
+    salaryRows,
+    requestRows,
+    totalEmployees,
+    departments,
+    employeesByDept,
+  ] = await Promise.all([
+
+    // حضور: تجميع حسب (شهر + حالة) مباشرة في الداتابيس بدل جلب كل السجلات
+    prisma.$queryRaw<{ month: number; status: string; cnt: number }[]>`
+      SELECT
+        CAST(strftime('%m', date) AS INTEGER) AS month,
+        status,
+        COUNT(*) AS cnt
+      FROM "Attendance"
+      WHERE date >= ${yearStart.toISOString()} AND date < ${yearEnd.toISOString()}
+      GROUP BY month, status
+    `,
+
+    // تأخير: مجموع دقائق التأخير لكل شهر (فقط checkIn بعد 08:00)
+    prisma.$queryRaw<{ month: number; lateMins: number }[]>`
+      SELECT
+        CAST(strftime('%m', date) AS INTEGER) AS month,
+        SUM(
+          MAX(0,
+            (CAST(strftime('%H', checkIn) AS INTEGER) * 60 +
+             CAST(strftime('%M', checkIn) AS INTEGER)) - 480
+          )
+        ) AS lateMins
+      FROM "Attendance"
+      WHERE
+        date >= ${yearStart.toISOString()} AND date < ${yearEnd.toISOString()}
+        AND status = 'late'
+        AND checkIn IS NOT NULL
+      GROUP BY month
+    `,
+
+    // رواتب: تجميع حسب (شهر + حالة)
+    prisma.salary.groupBy({
+      by: ["month", "status"],
+      where: { year },
+      _sum: { netSalary: true },
+      _count: true,
+    }),
+
+    // طلبات: تجميع حسب (نوع + حالة)
+    prisma.request.groupBy({
+      by: ["type", "status"],
+      where: { createdAt: { gte: yearStart, lt: yearEnd } },
+      _count: true,
+    }),
+
+    prisma.employee.count({ where: { status: "active" } }),
+    prisma.department.findMany({ select: { name: true } }),
+    prisma.employee.groupBy({
+      by: ["department"],
+      where: { status: "active" },
+      _count: true,
+    }),
+  ]);
+
+  // ── بناء attendanceByMonth من النتائج المجمّعة ──
+  const lateMap = new Map(attendanceLateCheckIns.map(r => [r.month, Number(r.lateMins) || 0]));
 
   const attendanceByMonth = Array.from({ length: 12 }, (_, i) => {
-    const monthRecords = attendance.filter((a) => new Date(a.date).getMonth() === i);
-    const present = monthRecords.filter((a) => a.status === "present").length;
-    const late = monthRecords.filter((a) => a.status === "late").length;
-    const absent = monthRecords.filter((a) => a.status === "absent").length;
-    // دقائق التأخير
-    const lateMins = monthRecords.reduce((sum, a) => {
-      if (!a.checkIn) return sum;
-      const d = new Date(a.checkIn);
-      const mins = d.getHours() * 60 + d.getMinutes();
-      return sum + (mins > 480 ? mins - 480 : 0); // 8:00 = 480
-    }, 0);
-    return { month: i + 1, present, late, absent, total: monthRecords.length, lateMins };
+    const m = i + 1;
+    const rows = attendanceByStatus.filter(r => Number(r.month) === m);
+    const get = (s: string) => Number(rows.find(r => r.status === s)?.cnt ?? 0);
+    return {
+      month: m,
+      present: get("present"),
+      late:    get("late"),
+      absent:  get("absent"),
+      total:   rows.reduce((sum, r) => sum + Number(r.cnt), 0),
+      lateMins: lateMap.get(m) ?? 0,
+    };
   });
 
-  // إحصائيات الرواتب الشهرية
-  const salaries = await prisma.salary.findMany({
-    where: { year },
-    select: { month: true, netSalary: true, status: true },
-  });
-
+  // ── بناء salaryByMonth ──
   const salaryByMonth = Array.from({ length: 12 }, (_, i) => {
-    const monthSalaries = salaries.filter((s) => s.month === i + 1);
-    const totalNet = monthSalaries.reduce((sum, s) => sum + s.netSalary, 0);
-    const paid = monthSalaries.filter((s) => s.status === "paid").length;
-    return { month: i + 1, totalNet, count: monthSalaries.length, paid };
+    const m = i + 1;
+    const rows = salaryRows.filter(r => r.month === m);
+    const totalNet = rows.reduce((sum, r) => sum + (r._sum.netSalary ?? 0), 0);
+    const count    = rows.reduce((sum, r) => sum + r._count, 0);
+    const paid     = rows.find(r => r.status === "paid")?._count ?? 0;
+    return { month: m, totalNet, count, paid };
   });
 
-  // إحصائيات الطلبات
-  const requests = await prisma.request.findMany({
-    where: {
-      createdAt: {
-        gte: new Date(year, 0, 1),
-        lt: new Date(year + 1, 0, 1),
-      },
-    },
-    select: { type: true, status: true },
-  });
-
+  // ── بناء requestsByType ──
   const requestsByType: Record<string, { total: number; approved: number; rejected: number; pending: number }> = {};
-  requests.forEach((r) => {
+  for (const r of requestRows) {
     if (!requestsByType[r.type]) requestsByType[r.type] = { total: 0, approved: 0, rejected: 0, pending: 0 };
-    requestsByType[r.type].total++;
-    if (r.status === "approved") requestsByType[r.type].approved++;
-    else if (r.status === "rejected") requestsByType[r.type].rejected++;
-    else requestsByType[r.type].pending++;
-  });
-
-  // إحصائيات عامة
-  const totalEmployees = await prisma.employee.count({ where: { status: "active" } });
-  const departments = await prisma.department.findMany({ select: { name: true } });
-  const employeesByDept = await prisma.employee.groupBy({
-    by: ["department"],
-    where: { status: "active" },
-    _count: true,
-  });
+    requestsByType[r.type].total += r._count;
+    if (r.status === "approved")       requestsByType[r.type].approved += r._count;
+    else if (r.status === "rejected")  requestsByType[r.type].rejected += r._count;
+    else                               requestsByType[r.type].pending  += r._count;
+  }
 
   return NextResponse.json({
     attendanceByMonth,
     salaryByMonth,
     requestsByType,
     totalEmployees,
-    departments: departments.map((d) => d.name),
-    employeesByDept: employeesByDept.map((e) => ({ department: e.department ?? "غير محدد", count: e._count })),
+    departments: departments.map(d => d.name),
+    employeesByDept: employeesByDept.map(e => ({ department: e.department ?? "غير محدد", count: e._count })),
   });
 }

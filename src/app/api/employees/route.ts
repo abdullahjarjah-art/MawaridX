@@ -30,7 +30,17 @@ export async function GET(req: NextRequest) {
   if (dept) where.department = dept;
 
   if (noPagination) {
-    const employees = await prisma.employee.findMany({ where, orderBy: { createdAt: "desc" } });
+    // للقوائم المنسدلة — نُعيد الحقول الأساسية فقط لتقليل حجم الـ response
+    const employees = await prisma.employee.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true, employeeNumber: true, firstName: true, lastName: true,
+        arabicName: true, email: true, department: true, jobTitle: true,
+        position: true, status: true, photo: true, managerId: true,
+        nationality: true, workLocationId: true,
+      },
+    });
     return NextResponse.json(employees);
   }
 

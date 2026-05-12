@@ -160,6 +160,11 @@ model Employee {
 
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+
+  @@index([status])
+  @@index([department])
+  @@index([managerId])
+  @@index([createdAt])
 }
 
 // ==============================
@@ -354,6 +359,8 @@ model Salary {
   updatedAt       DateTime  @updatedAt
 
   @@unique([employeeId, month, year])
+  @@index([year, month])
+  @@index([status])
 }
 
 model SalaryDeductionRule {
