@@ -58,6 +58,7 @@ export default function AttendancePage() {
   const [tab, setTab] = useState("attendance");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [holidays, setHolidays] = useState<{ date: string; name: string; type: string }[]>([]);
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [month, setMonth] = useState(String(now.getMonth() + 1));
   const [year, setYear] = useState(String(now.getFullYear()));
@@ -104,8 +105,10 @@ export default function AttendancePage() {
       setAttendance(data.data);
       setAttTotal(data.total);
       setAttTotalPages(data.totalPages);
+      setHolidays(data.holidays ?? []);
     } else {
       setAttendance(Array.isArray(data) ? data : []);
+      setHolidays([]);
     }
   };
 
@@ -357,13 +360,39 @@ export default function AttendancePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {filteredAtt.length === 0 ? (
+                  {/* ── صف العطل الرسمية ── */}
+                  {holidays.filter(h => {
+                    const hDate = new Date(h.date).toISOString().slice(0, 10);
+                    if (filterDay && hDate !== filterDay) return false;
+                    return true;
+                  }).map(h => (
+                    <tr key={`holiday-${h.date}`} className="bg-orange-50/60 dark:bg-orange-900/10">
+                      <td className="px-4 py-3" colSpan={2}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🎉</span>
+                          <div>
+                            <p className="font-medium text-orange-700 dark:text-orange-400 text-sm">{h.name}</p>
+                            <p className="text-xs text-orange-500">{new Date(h.date).toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "long" })}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs px-2 py-1 rounded-full font-medium bg-orange-100 text-orange-700 border border-orange-200">
+                          {t("عطلة رسمية")}
+                        </span>
+                      </td>
+                      <td colSpan={7} className="px-4 py-3 text-xs text-orange-400">{t("لا يُحسب غياباً")}</td>
+                    </tr>
+                  ))}
+                  {filteredAtt.length === 0 && holidays.filter(h => !filterDay || new Date(h.date).toISOString().slice(0, 10) === filterDay).length === 0 ? (
                     <tr><td colSpan={10} className="px-4 py-12 text-center text-gray-500">{t("لا توجد سجلات لهذا الشهر")}</td></tr>
                   ) : filteredAtt.map(a => {
                     const lateMins = a.status === "late" ? getLateMins(a.checkIn) : 0;
                     const st = attendanceStatusMap[a.status];
+                    // هل هذا اليوم عطلة؟ (لتمييز الصف)
+                    const isHoliday = holidays.some(h => new Date(h.date).toISOString().slice(0, 10) === new Date(a.date).toISOString().slice(0, 10));
                     return (
-                      <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <tr key={a.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 ${isHoliday ? "bg-orange-50/40 dark:bg-orange-900/5" : ""}`}>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <EmployeeAvatar photo={a.employee.photo} firstName={a.employee.firstName} lastName={a.employee.lastName} size="sm" />
@@ -373,7 +402,10 @@ export default function AttendancePage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-gray-600">{new Date(a.date).toLocaleDateString("ar-SA", { weekday: "short", day: "numeric", month: "short" })}</td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {new Date(a.date).toLocaleDateString("ar-SA", { weekday: "short", day: "numeric", month: "short" })}
+                          {isHoliday && <span className="mr-1 text-xs text-orange-500">🎉 {holidays.find(h => new Date(h.date).toISOString().slice(0,10) === new Date(a.date).toISOString().slice(0,10))?.name}</span>}
+                        </td>
                         <td className="px-4 py-3">
                           <span className={`text-xs px-2 py-1 rounded-full font-medium ${st?.color ?? "bg-gray-100 text-gray-600"}`}>
                             {st?.label ?? a.status}

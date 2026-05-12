@@ -30,6 +30,7 @@ export async function GET() {
     totalLeavesTaken,
     salary,
     custodyCount,
+    holidaysThisMonth,
   ] = await Promise.all([
     // رصيد الإجازات السنوية
     prisma.leaveBalance.findFirst({
@@ -44,7 +45,7 @@ export async function GET() {
     prisma.attendance.count({
       where: { employeeId: empId, date: { gte: monthStart, lte: monthEnd }, status: "late" },
     }),
-    // أيام الغياب هذا الشهر
+    // أيام الغياب هذا الشهر (تُحسب بعد استثناء العطل)
     prisma.attendance.count({
       where: { employeeId: empId, date: { gte: monthStart, lte: monthEnd }, status: "absent" },
     }),
@@ -65,6 +66,11 @@ export async function GET() {
     }),
     // عدد العهد
     prisma.custody.count({ where: { employeeId: empId, status: "active" } }),
+    // العطل الرسمية هذا الشهر (لاستثنائها من الغياب)
+    prisma.holiday.findMany({
+      where: { date: { gte: monthStart, lte: monthEnd } },
+      select: { date: true },
+    }),
   ]);
 
   // حساب مدة الخدمة
@@ -74,8 +80,24 @@ export async function GET() {
   const years = Math.floor(totalDays / 365);
   const months = Math.floor((totalDays % 365) / 30);
 
-  // نسبة الحضور هذا الشهر
-  const totalWorkDays = attendanceThisMonth + absentThisMonth;
+  // استثناء أيام الغياب التي تزامنت مع عطلة رسمية
+  const holidayDates = new Set(holidaysThisMonth.map(h => new Date(h.date).toISOString().slice(0, 10)));
+  // absentThisMonth من الداتابيس قد يشمل عطلاً — نستثنيها
+  // (السجلات الغائبة المدخلة يدوياً على أيام عطل تُحذف من الحساب)
+  // سجلات الغياب على أيام العطل (لاستثنائها)
+  const absentOnHolidays = holidayDates.size > 0
+    ? await prisma.attendance.count({
+        where: {
+          employeeId: empId,
+          status: "absent",
+          date: { in: Array.from(holidayDates).map(d => new Date(d)) },
+        },
+      })
+    : 0;
+  const realAbsent = Math.max(0, absentThisMonth - absentOnHolidays);
+
+  // نسبة الحضور هذا الشهر (بعد استثناء العطل)
+  const totalWorkDays = attendanceThisMonth + realAbsent;
   const attendanceRate = totalWorkDays > 0 ? Math.round((attendanceThisMonth / totalWorkDays) * 100) : 100;
 
   return NextResponse.json({
@@ -86,7 +108,8 @@ export async function GET() {
     totalLeavesTaken: totalLeavesTaken._sum.days ?? 0,
     attendanceThisMonth,
     lateThisMonth,
-    absentThisMonth,
+    absentThisMonth: realAbsent,
+    holidaysThisMonth: holidaysThisMonth.length,
     attendanceRate,
     pendingRequests,
     serviceYears: years,

@@ -33,9 +33,22 @@ export async function GET(req: NextRequest) {
     checkOutLocation: locationSelect,
   };
 
+  // جلب العطل الرسمية للشهر المطلوب (لعرضها في الجدول)
+  const holidays = (month && year)
+    ? await prisma.holiday.findMany({
+        where: {
+          date: {
+            gte: new Date(Number(year), Number(month) - 1, 1),
+            lt:  new Date(Number(year), Number(month), 1),
+          },
+        },
+        select: { date: true, name: true, type: true },
+      })
+    : [];
+
   if (noPagination) {
     const records = await prisma.attendance.findMany({ where, include: includeAll, orderBy: { date: "desc" } });
-    return NextResponse.json(records);
+    return NextResponse.json({ data: records, holidays });
   }
 
   const [total, records] = await Promise.all([
@@ -43,7 +56,7 @@ export async function GET(req: NextRequest) {
     prisma.attendance.findMany({ where, include: includeAll, orderBy: { date: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
   ]);
 
-  return NextResponse.json({ data: records, total, page, pageSize, totalPages: Math.ceil(total / pageSize) });
+  return NextResponse.json({ data: records, total, page, pageSize, totalPages: Math.ceil(total / pageSize), holidays });
 }
 
 export async function POST(req: NextRequest) {

@@ -24,7 +24,7 @@ export async function GET() {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const [attendance, employee, activeLeave] = await Promise.all([
+  const [attendance, employee, activeLeave, todayHoliday] = await Promise.all([
     prisma.attendance.findFirst({
       where: { employeeId: session.employeeId, date: { gte: today, lt: tomorrow } },
       include: { workLocation: { select: { id: true, name: true } } },
@@ -42,12 +42,18 @@ export async function GET() {
       },
       select: { type: true, startDate: true, endDate: true },
     }),
+    // هل اليوم عطلة رسمية؟
+    prisma.holiday.findFirst({
+      where: { date: { gte: today, lt: tomorrow } },
+      select: { name: true, type: true },
+    }),
   ]);
 
   return NextResponse.json({
     attendance,
     workLocation: employee?.workLocation ?? null,
     activeLeave: activeLeave ?? null,
+    todayHoliday: todayHoliday ?? null,
   });
 }
 
@@ -102,6 +108,18 @@ export async function POST(req: NextRequest) {
     },
     select: { type: true, startDate: true, endDate: true },
   });
+  // منع البصمة في العطل الرسمية
+  const holiday = await prisma.holiday.findFirst({
+    where: { date: { gte: today, lt: tomorrow } },
+    select: { name: true },
+  });
+  if (holiday) {
+    return NextResponse.json(
+      { error: `اليوم عطلة رسمية (${holiday.name}) — لا يمكن تسجيل البصمة` },
+      { status: 403 },
+    );
+  }
+
   if (activeLeave) {
     const leaveTypeMap: Record<string, string> = {
       annual: "سنوية", sick: "مرضية", emergency: "طارئة",
