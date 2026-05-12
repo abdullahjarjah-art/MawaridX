@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
   // ── تشغيل كل الاستعلامات بالتوازي ──
   const [
     attendanceByStatus,
+    workHoursByMonth,
     attendanceLateCheckIns,
     salaryRows,
     requestRows,
@@ -31,6 +32,18 @@ export async function GET(req: NextRequest) {
       FROM "Attendance"
       WHERE date >= ${yearStart.toISOString()} AND date < ${yearEnd.toISOString()}
       GROUP BY month, status
+    `,
+
+    // ساعات العمل: مجموع ساعات وأوفرتايم لكل شهر
+    prisma.$queryRaw<{ month: number; totalHours: number; totalOvertime: number }[]>`
+      SELECT
+        CAST(strftime('%m', date) AS INTEGER) AS month,
+        ROUND(SUM(COALESCE(workHours, 0)), 1) AS totalHours,
+        ROUND(SUM(COALESCE(overtimeMinutes, 0)) / 60.0, 1) AS totalOvertime
+      FROM "Attendance"
+      WHERE date >= ${yearStart.toISOString()} AND date < ${yearEnd.toISOString()}
+        AND workHours IS NOT NULL
+      GROUP BY month
     `,
 
     // تأخير: مجموع دقائق التأخير لكل شهر (فقط checkIn بعد 08:00)
@@ -78,17 +91,22 @@ export async function GET(req: NextRequest) {
   // ── بناء attendanceByMonth من النتائج المجمّعة ──
   const lateMap = new Map(attendanceLateCheckIns.map(r => [r.month, Number(r.lateMins) || 0]));
 
+  const workHoursMap = new Map(workHoursByMonth.map(r => [Number(r.month), { hours: Number(r.totalHours) || 0, overtime: Number(r.totalOvertime) || 0 }]));
+
   const attendanceByMonth = Array.from({ length: 12 }, (_, i) => {
     const m = i + 1;
     const rows = attendanceByStatus.filter(r => Number(r.month) === m);
     const get = (s: string) => Number(rows.find(r => r.status === s)?.cnt ?? 0);
+    const wh = workHoursMap.get(m) ?? { hours: 0, overtime: 0 };
     return {
       month: m,
-      present: get("present"),
-      late:    get("late"),
-      absent:  get("absent"),
-      total:   rows.reduce((sum, r) => sum + Number(r.cnt), 0),
-      lateMins: lateMap.get(m) ?? 0,
+      present:       get("present"),
+      late:          get("late"),
+      absent:        get("absent"),
+      total:         rows.reduce((sum, r) => sum + Number(r.cnt), 0),
+      lateMins:      lateMap.get(m) ?? 0,
+      totalHours:    wh.hours,
+      overtimeHours: wh.overtime,
     };
   });
 

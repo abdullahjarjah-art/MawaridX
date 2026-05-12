@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { calcWorkHours } from "@/lib/attendance-settings";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -131,6 +132,24 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── حساب ساعات العمل تلقائياً من checkIn/checkOut (يتجاهل القيمة اليدوية) ──
+  let workHoursCalc: number | undefined;
+  if (body.checkIn && body.checkOut) {
+    const checkInDt  = new Date(body.checkIn);
+    const checkOutDt = new Date(body.checkOut);
+    // التحقق أن الخروج بعد الدخول
+    if (checkOutDt <= checkInDt) {
+      return NextResponse.json({ error: "وقت الخروج يجب أن يكون بعد وقت الدخول" }, { status: 400 });
+    }
+    // جلب دقائق الاستراحة من شيفت الموظف
+    const empShiftForBreak = await prisma.employeeShift.findFirst({
+      where: { employeeId: body.employeeId, endDate: null },
+      select: { shift: { select: { breakMinutes: true } } },
+    });
+    const breakMins = empShiftForBreak?.shift?.breakMinutes ?? 0;
+    workHoursCalc = calcWorkHours(checkInDt, checkOutDt, breakMins) ?? undefined;
+  }
+
   const record = await prisma.attendance.create({
     data: {
       employeeId: body.employeeId,
@@ -139,7 +158,7 @@ export async function POST(req: NextRequest) {
       checkOut: body.checkOut ? new Date(body.checkOut) : undefined,
       status: statusFinal,
       notes: body.notes,
-      workHours: body.workHours ? parseFloat(body.workHours) : undefined,
+      workHours: workHoursCalc,   // محسوب تلقائياً — ما نقبل قيمة يدوية
       overtimeMinutes,
       workLocationId: body.workLocationId || null,
       checkInLocationId: body.checkInLocationId || null,

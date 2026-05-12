@@ -31,6 +31,8 @@ export async function GET() {
     salary,
     custodyCount,
     holidaysThisMonth,
+    workHoursAgg,
+    overtimeAgg,
   ] = await Promise.all([
     // رصيد الإجازات السنوية
     prisma.leaveBalance.findFirst({
@@ -71,6 +73,16 @@ export async function GET() {
       where: { date: { gte: monthStart, lte: monthEnd } },
       select: { date: true },
     }),
+    // إجمالي ساعات العمل هذا الشهر
+    prisma.attendance.aggregate({
+      where: { employeeId: empId, date: { gte: monthStart, lte: monthEnd }, workHours: { not: null } },
+      _sum: { workHours: true },
+    }),
+    // إجمالي الأوفرتايم هذا الشهر (بالدقائق)
+    prisma.attendance.aggregate({
+      where: { employeeId: empId, date: { gte: monthStart, lte: monthEnd }, overtimeMinutes: { gt: 0 } },
+      _sum: { overtimeMinutes: true },
+    }),
   ]);
 
   // حساب مدة الخدمة
@@ -110,6 +122,8 @@ export async function GET() {
     lateThisMonth,
     absentThisMonth: realAbsent,
     holidaysThisMonth: holidaysThisMonth.length,
+    totalWorkHoursThisMonth: Math.round((workHoursAgg._sum.workHours ?? 0) * 10) / 10,
+    totalOvertimeMinutesThisMonth: overtimeAgg._sum.overtimeMinutes ?? 0,
     attendanceRate,
     pendingRequests,
     serviceYears: years,

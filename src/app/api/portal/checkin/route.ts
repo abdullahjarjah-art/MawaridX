@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { getAttendanceSettings, timeToMins } from "@/lib/attendance-settings";
+import { getAttendanceSettings, timeToMins, calcWorkHours } from "@/lib/attendance-settings";
 
 // حساب المسافة بين نقطتين بالمتر (Haversine)
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -133,6 +133,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // جلب شيفت الموظف لمعرفة دقائق الاستراحة
+  const empShift = await prisma.employeeShift.findFirst({
+    where: { employeeId: session.employeeId, endDate: null },
+    include: { shift: { select: { breakMinutes: true, checkOutTime: true } } },
+  });
+  const breakMinutes = empShift?.shift?.breakMinutes ?? 0;
+
   const existing = await prisma.attendance.findFirst({
     where: { employeeId: session.employeeId, date: { gte: today, lt: tomorrow } },
   });
@@ -147,6 +154,7 @@ export async function POST(req: NextRequest) {
         checkIn: now,
         status: (() => { const att = attSettings; const limit = timeToMins(att.checkInTime) + att.lateToleranceMinutes; return now.getHours() * 60 + now.getMinutes() > limit ? "late" : "present"; })(),
         workLocationId: loc?.id ?? null,
+        source: "gps",
         notes: distanceMeters !== null ? `بُعد: ${distanceMeters}م` : undefined,
       },
       include: { workLocation: { select: { id: true, name: true } } },
@@ -159,11 +167,27 @@ export async function POST(req: NextRequest) {
     if (existing.checkOut) return NextResponse.json({ error: "تم تسجيل خروجك مسبقاً" }, { status: 400 });
 
     const checkInTime = existing.checkIn ?? now;
-    const workHours = Math.round(((now.getTime() - checkInTime.getTime()) / 3600000) * 100) / 100;
+
+    // التحقق أن وقت الخروج بعد الدخول
+    if (now <= checkInTime) {
+      return NextResponse.json({ error: "وقت الخروج يجب أن يكون بعد وقت الدخول" }, { status: 400 });
+    }
+
+    // ساعات العمل الصافية بعد خصم الاستراحة
+    const workHours = calcWorkHours(checkInTime, now, breakMinutes);
+
+    // حساب الأوفرتايم بناءً على شيفت الموظف
+    let overtimeMinutes = 0;
+    if (empShift?.shift?.checkOutTime) {
+      const [eh, em] = empShift.shift.checkOutTime.split(":").map(Number);
+      const shiftOutMins = eh * 60 + em;
+      const actualOutMins = now.getHours() * 60 + now.getMinutes();
+      overtimeMinutes = Math.max(0, actualOutMins - shiftOutMins);
+    }
 
     const record = await prisma.attendance.update({
       where: { id: existing.id },
-      data: { checkOut: now, workHours },
+      data: { checkOut: now, workHours, overtimeMinutes },
       include: { workLocation: { select: { id: true, name: true } } },
     });
     return NextResponse.json({ success: true, attendance: record, distance: distanceMeters });
