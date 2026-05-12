@@ -136,9 +136,8 @@ export async function POST(req: NextRequest) {
   // جلب شيفت الموظف لمعرفة دقائق الاستراحة
   const empShift = await prisma.employeeShift.findFirst({
     where: { employeeId: session.employeeId, endDate: null },
-    include: { shift: { select: { breakMinutes: true, checkOutTime: true } } },
+    include: { shift: { select: { checkOutTime: true } } },
   });
-  const breakMinutes = empShift?.shift?.breakMinutes ?? 0;
 
   const existing = await prisma.attendance.findFirst({
     where: { employeeId: session.employeeId, date: { gte: today, lt: tomorrow } },
@@ -174,7 +173,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ساعات العمل الصافية بعد خصم الاستراحة
-    const workHours = calcWorkHours(checkInTime, now, breakMinutes);
+    const workHours = calcWorkHours(checkInTime, now);
 
     // حساب الأوفرتايم بناءً على شيفت الموظف
     let overtimeMinutes = 0;

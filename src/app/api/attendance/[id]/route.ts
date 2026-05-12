@@ -3,14 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { calcWorkHours } from "@/lib/attendance-settings";
 
-/** جلب دقائق الاستراحة من شيفت الموظف */
-async function getBreakMinutes(employeeId: string): Promise<number> {
-  const empShift = await prisma.employeeShift.findFirst({
-    where: { employeeId, endDate: null },
-    select: { shift: { select: { breakMinutes: true } } },
-  });
-  return empShift?.shift?.breakMinutes ?? 0;
-}
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -40,8 +32,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     let workHours: number | undefined;
     if (checkOutDt && checkInDt) {
-      const breakMins = await getBreakMinutes(existing.employeeId);
-      workHours = calcWorkHours(checkInDt, checkOutDt, breakMins) ?? undefined;
+      workHours = calcWorkHours(checkInDt, checkOutDt) ?? undefined;
     }
 
     const record = await prisma.attendance.update({
@@ -67,8 +58,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   // حساب ساعات العمل تلقائياً
   let workHours: number | undefined;
   if (newCheckIn && newCheckOut) {
-    const breakMins = await getBreakMinutes(existing.employeeId);
-    workHours = calcWorkHours(newCheckIn, newCheckOut, breakMins) ?? undefined;
+    workHours = calcWorkHours(newCheckIn, newCheckOut) ?? undefined;
   }
 
   const record = await prisma.attendance.update({

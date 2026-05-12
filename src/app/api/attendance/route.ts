@@ -142,12 +142,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "وقت الخروج يجب أن يكون بعد وقت الدخول" }, { status: 400 });
     }
     // جلب دقائق الاستراحة من شيفت الموظف
-    const empShiftForBreak = await prisma.employeeShift.findFirst({
-      where: { employeeId: body.employeeId, endDate: null },
-      select: { shift: { select: { breakMinutes: true } } },
-    });
-    const breakMins = empShiftForBreak?.shift?.breakMinutes ?? 0;
-    workHoursCalc = calcWorkHours(checkInDt, checkOutDt, breakMins) ?? undefined;
+    workHoursCalc = calcWorkHours(checkInDt, checkOutDt) ?? undefined;
   }
 
   const record = await prisma.attendance.create({

@@ -34,21 +34,14 @@ export function timeToMins(time: string): number {
 }
 
 /**
- * حساب ساعات العمل الفعلية مع خصم الاستراحة
- * @param checkIn  وقت الدخول
- * @param checkOut وقت الخروج
- * @param breakMinutes دقائق الاستراحة (من الشيفت)
- * @returns ساعات العمل الصافية (مقربة لخانتين عشريتين) أو null إذا كان checkOut قبل checkIn
+ * حساب ساعات العمل من وقت الدخول والخروج
+ * @returns ساعات العمل (مقربة لخانتين عشريتين) أو null إذا كان checkOut قبل checkIn
  */
 export function calcWorkHours(
   checkIn: Date,
   checkOut: Date,
-  breakMinutes = 0,
 ): number | null {
   const diffMs = checkOut.getTime() - checkIn.getTime();
-  if (diffMs <= 0) return null; // خروج قبل الدخول — خطأ في البيانات
-  const rawHours = diffMs / 3_600_000;
-  const breakHours = breakMinutes / 60;
-  const net = Math.max(0, rawHours - breakHours);
-  return Math.round(net * 100) / 100;
+  if (diffMs <= 0) return null;
+  return Math.round((diffMs / 3_600_000) * 100) / 100;
 }
