@@ -254,6 +254,7 @@ model WorkLocation {
   checkInAttendances    Attendance[]         @relation("AttCheckIn")
   checkOutAttendances   Attendance[]         @relation("AttCheckOut")
   employeeLocations     EmployeeWorkLocation[]
+  devices               FingerprintDevice[]
 
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -291,6 +292,7 @@ model Attendance {
   checkOutLocationId String?
   checkOutLocation   WorkLocation? @relation("AttCheckOut", fields: [checkOutLocationId], references: [id])
   overtimeMinutes    Int?          @default(0)
+  source             String        @default("manual")  // manual | gps | fingerprint
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -673,4 +675,27 @@ model PushSubscription {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+// ==============================
+// أجهزة البصمة
+// ==============================
+
+model FingerprintDevice {
+  id          String        @id @default(cuid())
+  name        String
+  ip          String
+  port        Int           @default(4370)
+  serial      String?
+  password    Int           @default(0)
+  locationId  String?
+  location    WorkLocation? @relation(fields: [locationId], references: [id])
+  mode        String        @default("tcp")   // tcp | adms
+  admsKey     String?
+  lastSync    DateTime?
+  syncStatus  String        @default("idle")  // idle | syncing | error | ok
+  syncError   String?
+  active      Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 }

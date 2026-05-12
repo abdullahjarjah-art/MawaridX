@@ -28,6 +28,7 @@ import {
   FileText,
   FolderOpen,
   FileIcon,
+  Fingerprint,
 } from "lucide-react";
 
 // شعار PDF يُعرض كأيقونة لأن <img> لا يدعم عرض PDF
@@ -62,6 +63,7 @@ const navItems = [
   { href: "/departments", label: "الأقسام", icon: Layers },
   { href: "/locations", label: "مواقع العمل", icon: MapPin },
   { href: "/attendance", label: "الحضور والإجازات", icon: CalendarCheck },
+  { href: "/attendance/devices", label: "أجهزة البصمة", icon: Fingerprint },
   { href: "/shifts",     label: "جداول الدوام",      icon: AlarmClock },
   { href: "/calendar", label: "التقويم", icon: CalendarDays },
   { href: "/holidays", label: "العطل الرسمية", icon: CalendarCheck },

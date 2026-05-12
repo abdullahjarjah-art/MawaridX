@@ -19,7 +19,7 @@ import { EmployeeAvatar } from "@/components/employee-avatar";
 // ══════════════════════════════════════════════
 // أسئلة التقييم — 30 سؤال في 5 محاور
 // ══════════════════════════════════════════════
-export const SECTIONS = [
+const SECTIONS = [
   {
     id: "performance", label: "الأداء الوظيفي", icon: Target, color: "sky",
     questions: [
@@ -80,12 +80,12 @@ export const SECTIONS = [
 const ALL_QUESTIONS = SECTIONS.flatMap(s => s.questions);
 const TOTAL_MAX = ALL_QUESTIONS.length * 10;
 
-export function calcFinalScore(answers: Record<string, number>): number {
+function calcFinalScore(answers: Record<string, number>): number {
   const total = Object.values(answers).reduce((a, b) => a + b, 0);
   return Math.round((total / TOTAL_MAX) * 5 * 10) / 10;
 }
 
-export function scoreToGrade(score: number): { label: string; color: string } {
+function scoreToGrade(score: number): { label: string; color: string } {
   if (score >= 4.5) return { label: "ممتاز",       color: "bg-emerald-100 text-emerald-700 border-emerald-300" };
   if (score >= 3.5) return { label: "جيد جداً",    color: "bg-sky-100 text-sky-700 border-sky-300" };
   if (score >= 2.5) return { label: "جيد",          color: "bg-yellow-100 text-yellow-700 border-yellow-300" };
