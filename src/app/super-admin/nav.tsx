@@ -70,7 +70,7 @@ export function SuperAdminNav({ email }: { email: string }) {
           <div className="p-5 border-b border-brand-border">
             <div className="flex items-center gap-2.5 mb-3">
               <div className="bg-brand-gradient rounded-xl p-2 shadow-brand">
-                <MawaridXLogo size={28} animate />
+                <MawaridXLogo size={28} />
               </div>
               <div>
                 <MawaridXWordmark className="text-lg" />

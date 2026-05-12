@@ -94,7 +94,7 @@ export default function RegisterPage() {
           {/* شعار */}
           <div className="flex items-center gap-3 animate-fade-in">
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-2.5 ring-1 ring-white/20">
-              <MawaridXLogo size={44} animate />
+              <MawaridXLogo size={44} />
             </div>
             <div>
               <MawaridXWordmark className="text-2xl" variant="light" />
@@ -152,7 +152,7 @@ export default function RegisterPage() {
         <div className="relative w-full max-w-lg animate-scale-in my-6">
           {/* Logo للموبايل */}
           <div className="lg:hidden flex flex-col items-center mb-5">
-            <MawaridXLogo size={56} animate />
+            <MawaridXLogo size={56} />
             <MawaridXWordmark className="text-2xl mt-3" />
             <p className="text-brand-muted text-xs mt-1">إنشاء حساب جديد</p>
           </div>

@@ -14,6 +14,11 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/** تحويل رقم اليوم (0=أحد) إلى اسم عربي */
+function dayNameAr(day: number): string {
+  return ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"][day] ?? "";
+}
+
 // GET — جلب حالة الحضور اليوم
 export async function GET() {
   const session = await getSession();
@@ -24,7 +29,7 @@ export async function GET() {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const [attendance, employee, activeLeave, todayHoliday] = await Promise.all([
+  const [attendance, employee, activeLeave, todayHoliday, empShift] = await Promise.all([
     prisma.attendance.findFirst({
       where: { employeeId: session.employeeId, date: { gte: today, lt: tomorrow } },
       include: { workLocation: { select: { id: true, name: true } } },
@@ -47,13 +52,29 @@ export async function GET() {
       where: { date: { gte: today, lt: tomorrow } },
       select: { name: true, type: true },
     }),
+    // جدول دوام الموظف
+    prisma.employeeShift.findFirst({
+      where: { employeeId: session.employeeId, endDate: null },
+      include: {
+        shift: {
+          select: { id: true, name: true, checkInTime: true, checkOutTime: true, workDays: true, color: true },
+        },
+      },
+    }),
   ]);
+
+  // هل اليوم يوم دوام؟
+  const todayDay = new Date().getDay(); // 0=أحد
+  const workDaysList = empShift?.shift?.workDays?.split(",").map(Number) ?? null;
+  const isWorkDay = workDaysList ? workDaysList.includes(todayDay) : true; // بدون شيفت = دوام دائماً
 
   return NextResponse.json({
     attendance,
     workLocation: employee?.workLocation ?? null,
     activeLeave: activeLeave ?? null,
     todayHoliday: todayHoliday ?? null,
+    shift: empShift?.shift ?? null,
+    isWorkDay,
   });
 }
 
@@ -91,23 +112,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const attSettings = await getAttendanceSettings();
   const now = new Date();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  // منع البصمة إذا كان الموظف في إجازة معتمدة تشمل اليوم
-  const activeLeave = await prisma.leave.findFirst({
-    where: {
-      employeeId: session.employeeId,
-      status: "approved",
-      startDate: { lte: today },
-      endDate: { gte: today },
-    },
-    select: { type: true, startDate: true, endDate: true },
-  });
   // منع البصمة في العطل الرسمية
   const holiday = await prisma.holiday.findFirst({
     where: { date: { gte: today, lt: tomorrow } },
@@ -120,6 +130,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // منع البصمة إذا كان الموظف في إجازة معتمدة تشمل اليوم
+  const activeLeave = await prisma.leave.findFirst({
+    where: {
+      employeeId: session.employeeId,
+      status: "approved",
+      startDate: { lte: today },
+      endDate: { gte: today },
+    },
+    select: { type: true, endDate: true },
+  });
   if (activeLeave) {
     const leaveTypeMap: Record<string, string> = {
       annual: "سنوية", sick: "مرضية", emergency: "طارئة",
@@ -133,11 +153,27 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // جلب شيفت الموظف لمعرفة دقائق الاستراحة
+  // جلب شيفت الموظف الكامل
   const empShift = await prisma.employeeShift.findFirst({
     where: { employeeId: session.employeeId, endDate: null },
-    include: { shift: { select: { checkOutTime: true } } },
+    include: {
+      shift: {
+        select: { checkInTime: true, checkOutTime: true, workDays: true },
+      },
+    },
   });
+
+  // ── التحقق من أيام الدوام ──
+  if (empShift?.shift?.workDays) {
+    const workDaysList = empShift.shift.workDays.split(",").map(Number);
+    const todayDay = now.getDay(); // 0=أحد
+    if (!workDaysList.includes(todayDay)) {
+      return NextResponse.json(
+        { error: `اليوم (${dayNameAr(todayDay)}) ليس من أيام دوامك` },
+        { status: 403 },
+      );
+    }
+  }
 
   const existing = await prisma.attendance.findFirst({
     where: { employeeId: session.employeeId, date: { gte: today, lt: tomorrow } },
@@ -146,12 +182,29 @@ export async function POST(req: NextRequest) {
   if (action === "checkin") {
     if (existing) return NextResponse.json({ error: "تم تسجيل دخولك مسبقاً اليوم" }, { status: 400 });
 
+    // تحديد التأخير: أولاً من الشيفت، ثم من الإعدادات العامة
+    let status = "present";
+    if (empShift?.shift?.checkInTime) {
+      const [sh, sm] = empShift.shift.checkInTime.split(":").map(Number);
+      const shiftInMins = sh * 60 + sm;
+      const actualMins = now.getHours() * 60 + now.getMinutes();
+      // جلب مهلة التأخير
+      const tolSetting = await prisma.setting.findUnique({ where: { key: "lateToleranceMinutes" } });
+      const tolerance = tolSetting ? Number(tolSetting.value) : 15;
+      if (actualMins - shiftInMins > tolerance) status = "late";
+    } else {
+      // fallback على الإعدادات العامة
+      const attSettings = await getAttendanceSettings();
+      const limit = timeToMins(attSettings.checkInTime) + attSettings.lateToleranceMinutes;
+      if (now.getHours() * 60 + now.getMinutes() > limit) status = "late";
+    }
+
     const record = await prisma.attendance.create({
       data: {
         employeeId: session.employeeId,
         date: today,
         checkIn: now,
-        status: (() => { const att = attSettings; const limit = timeToMins(att.checkInTime) + att.lateToleranceMinutes; return now.getHours() * 60 + now.getMinutes() > limit ? "late" : "present"; })(),
+        status,
         workLocationId: loc?.id ?? null,
         source: "gps",
         notes: distanceMeters !== null ? `بُعد: ${distanceMeters}م` : undefined,
@@ -172,7 +225,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "وقت الخروج يجب أن يكون بعد وقت الدخول" }, { status: 400 });
     }
 
-    // ساعات العمل الصافية بعد خصم الاستراحة
     const workHours = calcWorkHours(checkInTime, now);
 
     // حساب الأوفرتايم بناءً على شيفت الموظف

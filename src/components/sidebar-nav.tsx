@@ -133,7 +133,7 @@ export function SidebarNav() {
           {branding.logoUrl ? (
             <LogoDisplay url={branding.logoUrl} name={branding.displayName} size={38} />
           ) : (
-            <MawaridXLogo size={38} animate />
+            <MawaridXLogo size={38} />
           )}
           <div className="min-w-0">
             {branding.logoUrl ? (

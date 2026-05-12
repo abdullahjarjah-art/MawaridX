@@ -38,7 +38,11 @@ export function NotificationBell({ employeeId }: { employeeId: string }) {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 15000);
+    // كل 60 ثانية بدل 15 — يقلل load على قاعدة البيانات بـ 75%
+    // ويتوقف إذا التبويب مخفي
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchNotifications();
+    }, 60000);
     return () => clearInterval(interval);
   }, [employeeId]);
 

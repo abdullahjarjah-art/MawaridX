@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // ── حساب التأخير بناءً على شيفت الموظف ──
+  // ── حساب التأخير والأوفرتايم بناءً على شيفت الموظف ──
   let statusFinal = body.status ?? "present";
   let overtimeMinutes = 0;
 
@@ -110,24 +110,39 @@ export async function POST(req: NextRequest) {
     if (empShift?.shift) {
       const shift = empShift.shift;
       const checkInDt = new Date(body.checkIn);
+
+      // ── التحقق من يوم الدوام (HR يرى تحذيراً في body ولكن لا يُمنع) ──
+      if (shift.workDays && !body.ignoreWorkDayCheck) {
+        const workDaysList = shift.workDays.split(",").map(Number);
+        const recordDay = checkInDt.getDay();
+        if (!workDaysList.includes(recordDay)) {
+          const dayNames = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+          return NextResponse.json({
+            error: `تحذير: ${dayNames[recordDay]} ليس من أيام دوام هذا الموظف (${shift.name}). أرسل ignoreWorkDayCheck: true للمتابعة.`,
+            workDayWarning: true,
+          }, { status: 422 });
+        }
+      }
+
       const [sh, sm] = shift.checkInTime.split(":").map(Number);
-      const shiftInMs = sh * 60 + sm; // دقائق
-      const actualInMs = checkInDt.getHours() * 60 + checkInDt.getMinutes();
-      const lateMins = actualInMs - shiftInMs;
+      const shiftInMins = sh * 60 + sm;
+      const actualInMins = checkInDt.getHours() * 60 + checkInDt.getMinutes();
+      const lateMins = actualInMins - shiftInMins;
 
       // جلب مهلة التأخير من الإعدادات (افتراضي 15 دقيقة)
-      const tolSetting = await prisma.setting.findUnique({ where: { key: "lateToleranceMinutes" } });
-      const tolerance = tolSetting ? Number(tolSetting.value) : 15;
-
-      if (lateMins > tolerance) statusFinal = "late";
+      if (!body.status) {  // لا تُعيد الحساب إذا حدد HR الحالة يدوياً
+        const tolSetting = await prisma.setting.findUnique({ where: { key: "lateToleranceMinutes" } });
+        const tolerance = tolSetting ? Number(tolSetting.value) : 15;
+        if (lateMins > tolerance) statusFinal = "late";
+      }
 
       // حساب الإضافي إذا أُرسل checkOut
       if (body.checkOut) {
         const checkOutDt = new Date(body.checkOut);
         const [eh, em] = shift.checkOutTime.split(":").map(Number);
-        const shiftOutMs = eh * 60 + em;
-        const actualOutMs = checkOutDt.getHours() * 60 + checkOutDt.getMinutes();
-        overtimeMinutes = Math.max(0, actualOutMs - shiftOutMs);
+        const shiftOutMins = eh * 60 + em;
+        const actualOutMins = checkOutDt.getHours() * 60 + checkOutDt.getMinutes();
+        overtimeMinutes = Math.max(0, actualOutMins - shiftOutMins);
       }
     }
   }

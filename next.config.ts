@@ -41,7 +41,11 @@ const nextConfig: NextConfig = {
     // A single RegExp is the cleanest option — covers all the runtime-data dirs.
     config.watchOptions = {
       ...config.watchOptions,
-      ignored: /[\\/](backups|node_modules|\.next)[\\/]|[\\/]public[\\/]uploads[\\/]/,
+      // تجاهل كل الملفات التي تتغيّر في وقت التشغيل حتى لا يُعيد webpack الـ compile باستمرار:
+      // - node_modules / .next / backups : المعتادة
+      // - *.db / *.db-wal / *.db-shm    : ملفات SQLite (تتغيّر مع كل عملية)
+      // - public/uploads                 : الصور المرفوعة
+      ignored: /[\\/](backups|node_modules|\.next)[\\/]|[\\/]public[\\/]uploads[\\/]|\.db(-wal|-shm|-journal)?$|\.tsbuildinfo$|dev-server\.log$/,
     };
 
     return config;

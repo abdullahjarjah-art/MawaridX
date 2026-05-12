@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   MapPin, Navigation, Clock, CheckCircle2, XCircle, Loader2,
-  LogIn, LogOut, AlertTriangle, Palmtree,
+  LogIn, LogOut, AlertTriangle, Palmtree, CalendarOff, Moon,
 } from "lucide-react";
 
 const GeofenceMap = dynamic(
@@ -36,6 +36,15 @@ type WorkLocation = {
   radius: number;
 };
 
+type ShiftInfo = {
+  id: string;
+  name: string;
+  checkInTime: string;
+  checkOutTime: string;
+  workDays: string;
+  color: string;
+};
+
 type State = "idle" | "locating" | "success" | "error" | "outside";
 
 function fmt(dt?: string) {
@@ -48,10 +57,20 @@ const leaveTypeMap: Record<string, string> = {
   unpaid: "بدون راتب", maternity: "أمومة", paternity: "أبوة",
 };
 
+const DAY_NAMES = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+
+function formatWorkDays(workDays: string): string {
+  const days = workDays.split(",").map(Number).sort();
+  return days.map(d => DAY_NAMES[d]).join(" · ");
+}
+
 export default function CheckinPage() {
   const [attendance, setAttendance] = useState<Attendance | null>(null);
   const [workLocation, setWorkLocation] = useState<WorkLocation | null>(null);
   const [activeLeave, setActiveLeave] = useState<ActiveLeave | null>(null);
+  const [todayHoliday, setTodayHoliday] = useState<{ name: string; type: string } | null>(null);
+  const [shift, setShift] = useState<ShiftInfo | null>(null);
+  const [isWorkDay, setIsWorkDay] = useState(true);
   const [state, setState] = useState<State>("idle");
   const [message, setMessage] = useState("");
   const [distance, setDistance] = useState<number | null>(null);
@@ -73,6 +92,9 @@ export default function CheckinPage() {
       setAttendance(data.attendance);
       setWorkLocation(data.workLocation);
       setActiveLeave(data.activeLeave ?? null);
+      setTodayHoliday(data.todayHoliday ?? null);
+      setShift(data.shift ?? null);
+      setIsWorkDay(data.isWorkDay ?? true);
     }
     setLoading(false);
   };
@@ -103,7 +125,7 @@ export default function CheckinPage() {
           setMessage(action === "checkin" ? "تم تسجيل دخولك بنجاح ✓" : "تم تسجيل خروجك بنجاح ✓");
           setDistance(data.distance);
           setAttendance(data.attendance);
-        } else if (res.status === 403) {
+        } else if (res.status === 403 && data.distance !== undefined) {
           setState("outside");
           setDistance(data.distance);
           setMessage(`أنت على بُعد ${data.distance} متر من ${data.locationName || "موقع العمل"} (النطاق المسموح: ${data.radius} متر)`);
@@ -128,6 +150,8 @@ export default function CheckinPage() {
   const checkedOut = !!attendance?.checkOut;
   const hasLocation = !!workLocation?.latitude;
   const onLeave = !!activeLeave;
+  const isHoliday = !!todayHoliday;
+  const blockedFromCheckin = onLeave || isHoliday || !isWorkDay;
 
   const remainingLeaveDays = activeLeave
     ? Math.ceil((new Date(activeLeave.endDate).getTime() - new Date(new Date().toDateString()).getTime()) / (1000 * 60 * 60 * 24))
@@ -150,6 +174,37 @@ export default function CheckinPage() {
           {now.toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "long" })}
         </p>
       </div>
+
+      {/* بانر العطلة الرسمية */}
+      {isHoliday && todayHoliday && (
+        <Card className="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100/60 shadow-sm">
+          <CardContent className="p-5 flex items-center gap-3">
+            <div className="w-12 h-12 bg-orange-200 rounded-2xl flex items-center justify-center shrink-0 text-2xl">🎉</div>
+            <div>
+              <p className="font-bold text-orange-900 text-base">{todayHoliday.name}</p>
+              <p className="text-xs text-orange-600">عطلة رسمية — لا يمكن تسجيل البصمة</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* بانر يوم الإجازة الأسبوعية */}
+      {!isHoliday && !onLeave && !isWorkDay && (
+        <Card className="border-2 border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100/60 shadow-sm">
+          <CardContent className="p-5 flex items-center gap-3">
+            <div className="w-12 h-12 bg-slate-200 rounded-2xl flex items-center justify-center shrink-0">
+              <CalendarOff className="h-6 w-6 text-slate-600" />
+            </div>
+            <div>
+              <p className="font-bold text-slate-800 text-base">يوم إجازة أسبوعية</p>
+              <p className="text-xs text-slate-500">
+                {DAY_NAMES[now.getDay()]} ليس من أيام دوامك
+                {shift ? ` (${shift.name})` : ""}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* بانر الإجازة */}
       {onLeave && activeLeave && (
@@ -183,6 +238,32 @@ export default function CheckinPage() {
               </div>
             </div>
             <p className="text-xs text-purple-500 text-center mt-3">لا يمكن تسجيل البصمة خلال فترة الإجازة</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* جدول الدوام */}
+      {shift && (
+        <Card className="border-2" style={{ borderColor: shift.color + "40" }}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: shift.color }} />
+              <p className="font-semibold text-gray-800 text-sm">{shift.name}</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="bg-gray-50 rounded-xl p-2">
+                <p className="text-xs text-gray-400 mb-0.5">الدخول</p>
+                <p className="font-bold text-gray-800 tabular-nums text-sm">{shift.checkInTime}</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-2">
+                <p className="text-xs text-gray-400 mb-0.5">الخروج</p>
+                <p className="font-bold text-gray-800 tabular-nums text-sm">{shift.checkOutTime}</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-2">
+                <p className="text-xs text-gray-400 mb-0.5">أيام الدوام</p>
+                <p className="font-medium text-gray-600 text-xs leading-tight">{formatWorkDays(shift.workDays)}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -287,7 +368,17 @@ export default function CheckinPage() {
 
       {/* أزرار البصمة */}
       <div className="grid gap-3">
-        {onLeave ? (
+        {isHoliday ? (
+          <div className="h-16 rounded-2xl bg-orange-50 border-2 border-orange-200 flex items-center justify-center gap-2 text-orange-500">
+            <span className="text-xl">🎉</span>
+            <span className="font-medium">البصمة متوقفة — عطلة رسمية</span>
+          </div>
+        ) : !isWorkDay ? (
+          <div className="h-16 rounded-2xl bg-slate-100 border-2 border-slate-200 flex items-center justify-center gap-2 text-slate-500">
+            <CalendarOff className="h-5 w-5" />
+            <span className="font-medium">البصمة متوقفة — يوم إجازة</span>
+          </div>
+        ) : onLeave ? (
           <div className="h-16 rounded-2xl bg-purple-50 border-2 border-purple-200 flex items-center justify-center gap-2 text-purple-500">
             <Palmtree className="h-5 w-5" />
             <span className="font-medium">البصمة متوقفة خلال الإجازة</span>
@@ -303,18 +394,16 @@ export default function CheckinPage() {
             تسجيل الدخول
           </Button>
         ) : !checkedOut ? (
-          <>
-            <Button
-              size="lg"
-              variant="outline"
-              className="h-16 text-lg gap-3 rounded-2xl border-2 border-red-200 text-red-600 hover:bg-red-50"
-              disabled={state === "locating"}
-              onClick={() => doCheckin("checkout")}
-            >
-              {state === "locating" ? <Loader2 className="h-6 w-6 animate-spin" /> : <LogOut className="h-6 w-6" />}
-              تسجيل الخروج
-            </Button>
-          </>
+          <Button
+            size="lg"
+            variant="outline"
+            className="h-16 text-lg gap-3 rounded-2xl border-2 border-red-200 text-red-600 hover:bg-red-50"
+            disabled={state === "locating"}
+            onClick={() => doCheckin("checkout")}
+          >
+            {state === "locating" ? <Loader2 className="h-6 w-6 animate-spin" /> : <LogOut className="h-6 w-6" />}
+            تسجيل الخروج
+          </Button>
         ) : (
           <div className="h-16 rounded-2xl bg-gray-100 flex items-center justify-center gap-2 text-gray-400">
             <CheckCircle2 className="h-5 w-5" />

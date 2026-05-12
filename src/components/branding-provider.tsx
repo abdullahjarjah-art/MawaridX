@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, ReactNode } from "react";
 
 // ──────────────────────────────────────────────────────────
 // BrandingProvider — يقرأ branding من API ويتاحه لكامل الـ UI
@@ -28,6 +28,17 @@ const DEFAULT: Branding = {
   email:         "",
 };
 
+const CACHE_KEY = "hr_branding_cache";
+
+/** قراءة آخر branding محفوظ من localStorage (يُعرض فوراً بدون انتظار API) */
+function readCache(): Branding {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (raw) return { ...DEFAULT, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return DEFAULT;
+}
+
 type Ctx = {
   branding: Branding;
   loading: boolean;
@@ -41,14 +52,11 @@ const BrandingContext = createContext<Ctx>({
 });
 
 export function BrandingProvider({ children }: { children: ReactNode }) {
-  // loading starts as false — avoids any state-before-mount issues during SSR/hydration
+  // ابدأ بالكاش المحفوظ — يُحلّ مشكلة وميض اللوقو عند التنقل
   const [branding, setBranding] = useState<Branding>(DEFAULT);
   const [loading, setLoading]   = useState(false);
-
-  // Stable ref: true once the component is committed to the DOM
   const mountedRef = useRef(false);
 
-  // Exposed refresh function — stable via ref so consumers don't re-render needlessly
   const fetchBranding = () => {
     if (!mountedRef.current) return;
     const controller = new AbortController();
@@ -57,7 +65,11 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
     fetch("/api/settings/branding", { cache: "no-store", signal: controller.signal })
       .then(r => (r.ok ? r.json() : null))
       .then(data => {
-        if (mountedRef.current && data) setBranding({ ...DEFAULT, ...data });
+        if (!mountedRef.current || !data) return;
+        const merged = { ...DEFAULT, ...data };
+        setBranding(merged);
+        // احفظ في localStorage لاستخدامه فوراً عند التحميل القادم
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(merged)); } catch { /* ignore */ }
       })
       .catch(() => { /* aborted or network error — ignore */ })
       .finally(() => {
@@ -67,18 +79,19 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
     return controller;
   };
 
-  useEffect(() => {
-    // Mark as mounted — this runs synchronously after commit, before any paint
-    mountedRef.current = true;
-
-    // Now safe to start the fetch
-    const controller = fetchBranding();
-
-    // طبّق اللون الأساسي على الـ CSS variables عند التغيير
-    if (typeof document !== "undefined" && branding.primaryColor) {
-      document.documentElement.style.setProperty("--brand-primary-custom", branding.primaryColor);
+  // useLayoutEffect يعمل قبل أي رسم على الشاشة — يمنع flash اللوقو الافتراضي تماماً
+  useLayoutEffect(() => {
+    const cached = readCache();
+    setBranding(cached);
+    if (cached.primaryColor) {
+      document.documentElement.style.setProperty("--brand-primary-custom", cached.primaryColor);
     }
+  }, []);
 
+  useEffect(() => {
+    mountedRef.current = true;
+    // حدّث من الـ API في الخلفية بعد الرسم
+    const controller = fetchBranding();
     return () => {
       mountedRef.current = false;
       controller?.abort();

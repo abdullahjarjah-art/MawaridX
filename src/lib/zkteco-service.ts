@@ -1,5 +1,6 @@
 import ZKLib from "node-zklib";
 import { prisma } from "@/lib/prisma";
+import { calcWorkHours } from "@/lib/attendance-settings";
 
 export async function syncDevice(deviceId: string): Promise<{ synced: number; errors: string[] }> {
   const device = await prisma.fingerprintDevice.findUnique({ where: { id: deviceId } });
@@ -85,12 +86,27 @@ export async function processAttendancePunch({
   });
   if (activeLeave) return; // skip — on leave
 
+  // Check if today is a holiday
+  const tomorrow = new Date(dateOnly);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const holiday = await prisma.holiday.findFirst({
+    where: { date: { gte: dateOnly, lt: tomorrow } },
+    select: { id: true },
+  });
+  if (holiday) return; // skip — official holiday
+
+  // Check if this is a work day per shift
+  const shift = employee.shifts[0]?.shift;
+  if (shift?.workDays) {
+    const workDaysList = shift.workDays.split(",").map(Number);
+    if (!workDaysList.includes(attTime.getDay())) return; // skip — not a work day
+  }
+
   // Get existing attendance for this day
   const existing = await prisma.attendance.findFirst({
     where: { employeeId: employee.id, date: dateOnly },
   });
 
-  const shift = employee.shifts[0]?.shift;
   const tolSetting = await prisma.setting.findUnique({ where: { key: "lateToleranceMinutes" } });
   const tolerance = tolSetting ? Number(tolSetting.value) : 15;
 
@@ -117,7 +133,7 @@ export async function processAttendancePunch({
     });
   } else if (existing.checkIn && !existing.checkOut) {
     // Second punch → check-out
-    const workHours = (attTime.getTime() - existing.checkIn.getTime()) / 3600000;
+    const workHours = calcWorkHours(existing.checkIn, attTime);
     let overtimeMinutes = 0;
 
     if (shift) {
@@ -131,7 +147,7 @@ export async function processAttendancePunch({
       where: { id: existing.id },
       data: {
         checkOut: attTime,
-        workHours: Math.round(workHours * 100) / 100,
+        workHours: workHours ?? undefined,
         overtimeMinutes,
         checkOutLocationId: locationId ?? null,
       },
