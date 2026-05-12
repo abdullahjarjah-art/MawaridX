@@ -1,8 +1,25 @@
-import fs from "fs";
-import path from "path";
+// Server-only module — uses Node.js built-ins (fs, path)
+// Lazy require() instead of top-level import so webpack can apply
+// resolve.fallback: { fs: false } without throwing "Module not found"
+/* eslint-disable @typescript-eslint/no-require-imports */
 
-const DB_PATH   = path.join(process.cwd(), "data", "hr.db");
-const BACKUP_DIR = path.join(process.cwd(), "backups");
+type NodeFS   = typeof import("fs");
+type NodePath = typeof import("path");
+const _fs   = (): NodeFS   => require("fs");
+const _path = (): NodePath => require("path");
+
+// يتزامن مع lib/prisma.ts — يقرأ من DATABASE_URL أو fallback إلى data/hr.db
+function resolveDbPath(): string {
+  const p = _path();
+  const url = process.env.DATABASE_URL;
+  if (url?.startsWith("file:")) {
+    const rel = url.slice("file:".length);
+    return p.isAbsolute(rel) ? rel : p.join(process.cwd(), rel);
+  }
+  return p.join(process.cwd(), "data", "hr.db");
+}
+const DB_PATH    = resolveDbPath();
+const BACKUP_DIR = _path().join(process.cwd(), "backups");
 const MAX_BACKUPS = 14; // احتفظ بآخر 14 نسخة
 
 export type BackupMeta = {
@@ -12,15 +29,18 @@ export type BackupMeta = {
 };
 
 function ensureDir() {
+  const fs = _fs();
   if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
 }
 
 /** إنشاء نسخة احتياطية — يعيد اسم الملف */
 export function createBackup(): string {
+  const fs   = _fs();
+  const path = _path();
   ensureDir();
   if (!fs.existsSync(DB_PATH)) throw new Error("ملف قاعدة البيانات غير موجود");
 
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19); // 2025-04-25T14-30-00
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const name  = `backup-${stamp}.db`;
   fs.copyFileSync(DB_PATH, path.join(BACKUP_DIR, name));
 
@@ -33,21 +53,24 @@ export function createBackup(): string {
 
 /** قائمة النسخ الاحتياطية مرتبة من الأحدث */
 export function listBackups(): BackupMeta[] {
+  const fs   = _fs();
+  const path = _path();
   ensureDir();
   return fs
     .readdirSync(BACKUP_DIR)
-    .filter(f => f.startsWith("backup-") && f.endsWith(".db"))
-    .map(name => {
+    .filter((f: string) => f.startsWith("backup-") && f.endsWith(".db"))
+    .map((name: string) => {
       const stat = fs.statSync(path.join(BACKUP_DIR, name));
       return { name, sizeBytes: stat.size, createdAt: stat.mtime };
     })
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    .sort((a: BackupMeta, b: BackupMeta) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
 /** حذف نسخة احتياطية */
 export function deleteBackup(name: string): boolean {
-  // أمان: منع path traversal
   if (!name.match(/^backup-[\d\-T]+\.db$/) || name.includes("/") || name.includes("\\")) return false;
+  const fs   = _fs();
+  const path = _path();
   const filePath = path.join(BACKUP_DIR, name);
   if (!fs.existsSync(filePath)) return false;
   fs.unlinkSync(filePath);
@@ -57,6 +80,8 @@ export function deleteBackup(name: string): boolean {
 /** قراءة ملف نسخة للتحميل */
 export function readBackup(name: string): Buffer | null {
   if (!name.match(/^backup-[\d\-T]+\.db$/) || name.includes("/") || name.includes("\\")) return null;
+  const fs   = _fs();
+  const path = _path();
   const filePath = path.join(BACKUP_DIR, name);
   if (!fs.existsSync(filePath)) return null;
   return fs.readFileSync(filePath);

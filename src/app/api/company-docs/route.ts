@@ -13,6 +13,12 @@ export async function GET(req: NextRequest) {
 
   const where: Record<string, unknown> = { isActive: true };
   if (category && category !== "all") where.category = category;
+  const folderId = searchParams.get("folderId");
+  if (folderId === "root") {
+    where.folderId = null;
+  } else if (folderId) {
+    where.folderId = folderId;
+  }
 
   const docs = await prisma.companyDocument.findMany({
     where,
@@ -36,6 +42,11 @@ export async function GET(req: NextRequest) {
         return emp?.department && depts.includes(emp.department);
       }
       if (doc.accessLevel === "specific") {
+        const ids: string[] = doc.accessEmployeeIds ? JSON.parse(doc.accessEmployeeIds) : [];
+        return ids.includes(employeeId);
+      }
+      if (doc.accessLevel === "manager_specific") {
+        if (!isManager) return false;
         const ids: string[] = doc.accessEmployeeIds ? JSON.parse(doc.accessEmployeeIds) : [];
         return ids.includes(employeeId);
       }
@@ -72,6 +83,7 @@ export async function POST(req: NextRequest) {
       accessEmployeeIds: body.accessEmployeeIds ? JSON.stringify(body.accessEmployeeIds) : null,
       expiryDate:       body.expiryDate  ? new Date(body.expiryDate) : null,
       notifyDaysBefore: body.notifyDaysBefore ? parseInt(body.notifyDaysBefore) : 30,
+      folderId:         body.folderId || null,
       createdBy:        session.userId,
       creatorName:      body.creatorName || null,
     },

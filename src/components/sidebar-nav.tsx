@@ -27,7 +27,25 @@ import {
   MapPin,
   FileText,
   FolderOpen,
+  FileIcon,
 } from "lucide-react";
+
+// شعار PDF يُعرض كأيقونة لأن <img> لا يدعم عرض PDF
+function LogoDisplay({ url, name, size = 38 }: { url: string; name: string; size?: number }) {
+  if (url.endsWith(".pdf")) {
+    return (
+      <div
+        className="rounded-lg bg-red-50 border border-red-200 flex flex-col items-center justify-center shrink-0"
+        style={{ width: size, height: size }}
+        title={name}
+      >
+        <FileIcon className="text-red-500" style={{ width: size * 0.45, height: size * 0.45 }} />
+      </div>
+    );
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={url} alt={name} className="rounded-lg object-contain bg-white/50 shrink-0" style={{ width: size, height: size }} />;
+}
 import { MawaridXLogo, MawaridXWordmark } from "@/components/mawaridx-logo";
 import { useBranding } from "@/components/branding-provider";
 import { useEffect, useState } from "react";
@@ -111,8 +129,7 @@ export function SidebarNav() {
       <aside className="hidden lg:flex flex-col w-64 glass-strong border-l border-brand-border h-screen fixed right-0 top-0 z-30 shadow-soft">
         <div className="relative flex items-center gap-3 px-5 py-4 border-b border-brand-border">
           {branding.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={branding.logoUrl} alt={branding.displayName} className="h-10 w-10 rounded-lg object-contain bg-white/50" />
+            <LogoDisplay url={branding.logoUrl} name={branding.displayName} size={38} />
           ) : (
             <MawaridXLogo size={38} animate />
           )}

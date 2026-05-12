@@ -14,6 +14,22 @@ const nextConfig: NextConfig = {
     "*.loca.lt",
     "*.trycloudflare.com",
   ],
+
+  // Webpack: mark Node.js built-ins as external so they don't get bundled
+  // isServer:true + nextRuntime:'edge' = Edge runtime (no fs/path); isServer:false = browser
+  webpack: (config, { isServer, nextRuntime }) => {
+    const needsFallback = !isServer || nextRuntime === "edge";
+    if (needsFallback) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        crypto: false,
+        os: false,
+      };
+    }
+    return config;
+  },
 };
 
 export default nextConfig;

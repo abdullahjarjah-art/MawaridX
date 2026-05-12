@@ -16,6 +16,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
         take: 20,
         select: { id: true, employeeId: true, employeeName: true, downloadedAt: true },
       },
+      files: true,
     },
   });
   if (!doc) return NextResponse.json({ error: "غير موجود" }, { status: 404 });
@@ -32,7 +33,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const body = await req.json();
 
-  const doc = await prisma.companyDocument.update({
+  await prisma.companyDocument.update({
     where: { id },
     data: {
       title:            body.title?.trim(),
@@ -48,9 +49,31 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       expiryDate:       body.expiryDate  ? new Date(body.expiryDate) : null,
       notifyDaysBefore: body.notifyDaysBefore ? parseInt(body.notifyDaysBefore) : 30,
       isActive:         body.isActive !== undefined ? body.isActive : true,
+      folderId:         body.folderId !== undefined ? (body.folderId || null) : undefined,
     },
   });
-  return NextResponse.json(doc);
+
+  // Handle files update
+  if (Array.isArray(body.files)) {
+    // Delete all existing files and re-create (simplest approach)
+    await prisma.companyDocumentFile.deleteMany({ where: { documentId: id } });
+    if (body.files.length > 0) {
+      await prisma.companyDocumentFile.createMany({
+        data: body.files.map((f: { url: string; name: string; size?: number; fileType?: string }) => ({
+          documentId: id,
+          fileUrl: f.url,
+          fileName: f.name,
+          fileSize: f.size ? parseInt(String(f.size)) : null,
+          fileType: f.fileType || null,
+        })),
+      });
+    }
+  }
+  const docWithFiles = await prisma.companyDocument.findUnique({
+    where: { id },
+    include: { files: true },
+  });
+  return NextResponse.json(docWithFiles);
 }
 
 // ─── DELETE: حذف مستند (HR / admin) ───

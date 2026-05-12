@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Upload, Trash2, Save, CheckCircle2, AlertCircle, Image as ImageIcon, Palette } from "lucide-react";
+import { ArrowLeft, Upload, Trash2, Save, CheckCircle2, AlertCircle, Image as ImageIcon, Palette, FileIcon } from "lucide-react";
 import Link from "next/link";
 import { useBranding, type Branding } from "@/components/branding-provider";
 
@@ -63,9 +63,10 @@ export default function BrandingPage() {
       const r = await fetch("/api/settings/branding/logo", { method: "POST", body: fd });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error ?? "فشل رفع الشعار");
-      await refresh();
+      // تحديث فوري بدون انتظار refresh
       setForm(p => ({ ...p, logoUrl: data.logoUrl }));
       showMsg("ok", "تم رفع الشعار");
+      refresh(); // في الخلفية لمزامنة السايدبار
     } catch (err) {
       showMsg("err", err instanceof Error ? err.message : "فشل الرفع");
     } finally {
@@ -79,9 +80,10 @@ export default function BrandingPage() {
     try {
       const r = await fetch("/api/settings/branding/logo", { method: "DELETE" });
       if (!r.ok) throw new Error("فشل الحذف");
-      await refresh();
+      // تحديث فوري بدون انتظار refresh
       setForm(p => ({ ...p, logoUrl: null }));
       showMsg("ok", "تم حذف الشعار");
+      refresh(); // في الخلفية لمزامنة السايدبار
     } catch (err) {
       showMsg("err", err instanceof Error ? err.message : "فشل الحذف");
     }
@@ -116,15 +118,22 @@ export default function BrandingPage() {
           <div className="flex items-center gap-4">
             <div className="w-24 h-24 rounded-xl border-2 border-dashed border-brand-border bg-brand-canvas flex items-center justify-center overflow-hidden">
               {form.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={form.logoUrl} alt="logo" className="w-full h-full object-contain" />
+                form.logoUrl.endsWith(".pdf") ? (
+                  <div className="flex flex-col items-center gap-1 p-2">
+                    <FileIcon className="h-8 w-8 text-red-500" />
+                    <span className="text-[10px] text-red-500 font-medium">PDF</span>
+                  </div>
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={form.logoUrl} alt="logo" className="w-full h-full object-contain" />
+                )
               ) : (
                 <ImageIcon className="h-8 w-8 text-brand-muted" />
               )}
             </div>
             <div className="flex flex-col gap-2">
               <label className="inline-flex items-center justify-center gap-2 rounded-md bg-brand-gradient text-white text-sm font-medium px-4 py-2 cursor-pointer disabled:opacity-50 hover:opacity-90 transition-opacity">
-                <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={onLogoSelect} disabled={uploading} className="hidden" />
+                <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,application/pdf" onChange={onLogoSelect} disabled={uploading} className="hidden" />
                 <Upload className="h-4 w-4" />
                 {uploading ? "جاري الرفع..." : "رفع شعار"}
               </label>
@@ -133,7 +142,7 @@ export default function BrandingPage() {
                   <Trash2 className="h-4 w-4 ml-2" />حذف الشعار
                 </Button>
               )}
-              <p className="text-xs text-brand-muted">PNG, JPEG, WebP, SVG — حد أقصى 2MB</p>
+              <p className="text-xs text-brand-muted">PNG, JPEG, WebP, SVG, PDF — حد أقصى 5MB</p>
             </div>
           </div>
         </CardContent>

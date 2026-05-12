@@ -54,7 +54,49 @@ services:
       - company-a-backups:/app/backups
     healthcheck: *healthcheck
 
-  # ────────── Reverse Proxy ──────────
+  # ────────── Tenant 2 — reuses the image built by tenant A ──────────
+  hr-company-b:
+    image: mawaridx-app:latest
+    container_name: mawaridx-company-b
+    restart: unless-stopped
+    networks:
+      - mawaridx-internal
+    depends_on:
+      - hr-company-a
+    environment:
+      <<: *app-env
+      TENANT_ID: company-b
+      COMPANY_NAME: ${COMPANY_B_NAME:-Company B}
+      COMPANY_PLAN: ${COMPANY_B_PLAN:-trial}
+      NEXT_PUBLIC_APP_URL: ${COMPANY_B_URL}
+    volumes:
+      - company-b-db:/app/data
+      - company-b-uploads:/app/public/uploads
+      - company-b-backups:/app/backups
+    healthcheck: *healthcheck
+
+  # ────────── Tenant 3 — reuses the image built by tenant A ──────────
+  hr-company-c:
+    image: mawaridx-app:latest
+    container_name: mawaridx-company-c
+    restart: unless-stopped
+    networks:
+      - mawaridx-internal
+    depends_on:
+      - hr-company-a
+    environment:
+      <<: *app-env
+      TENANT_ID: company-c
+      COMPANY_NAME: ${COMPANY_C_NAME:-Company C}
+      COMPANY_PLAN: ${COMPANY_C_PLAN:-trial}
+      NEXT_PUBLIC_APP_URL: ${COMPANY_C_URL}
+    volumes:
+      - company-c-db:/app/data
+      - company-c-uploads:/app/public/uploads
+      - company-c-backups:/app/backups
+    healthcheck: *healthcheck
+
+  # ────────── Reverse Proxy (only host-exposed service) ──────────
   # External traffic is fronted by a separate Traefik container running
   # on the VPS host network. Traefik discovers this service via the
   # `traefik.*` labels below and proxies https://mawaridx.com to it,
@@ -97,4 +139,10 @@ volumes:
   company-a-db:
   company-a-uploads:
   company-a-backups:
+  company-b-db:
+  company-b-uploads:
+  company-b-backups:
+  company-c-db:
+  company-c-uploads:
+  company-c-backups:
   certbot-www:

@@ -23,6 +23,8 @@ type EmpInfo = {
   housingAllowance: number;
   transportAllowance: number;
   otherAllowance: number;
+  bankName?: string;
+  iban?: string;
 };
 
 const monthNames = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
@@ -78,6 +80,8 @@ export default function PortalSalaryPage() {
           housingAllowance: data.employee.housingAllowance ?? 0,
           transportAllowance: data.employee.transportAllowance ?? 0,
           otherAllowance: data.employee.otherAllowance ?? 0,
+          bankName: data.employee.bankName,
+          iban: data.employee.iban,
         });
         // جلب آخر سنتين من الرواتب
         fetch(`/api/salaries?employeeId=${data.employee.id}&year=${now.getFullYear()}`)
@@ -112,6 +116,9 @@ export default function PortalSalaryPage() {
       nationality: emp.nationality,
       month: s.month, year: s.year,
       basicSalary: s.basicSalary,
+      housingAllowance: emp.housingAllowance,
+      transportAllowance: emp.transportAllowance,
+      otherAllowance: emp.otherAllowance,
       allowances: s.allowances,
       bonus: s.bonus,
       overtimePay: s.overtimePay,
@@ -120,6 +127,8 @@ export default function PortalSalaryPage() {
       gosiEmployer: s.gosiEmployer ?? 0,
       netSalary: s.netSalary,
       status: s.status, paidAt: s.paidAt, notes: s.notes,
+      bankName: emp.bankName,
+      iban: emp.iban,
     });
   };
 

@@ -11,7 +11,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!session) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
 
     const { id } = await params;
-    const { status, managerNote, hrNote, role } = await req.json();
+    const { status, managerNote, hrNote } = await req.json();
+
+    // الدور يُشتق من الجلسة لا من الطلب (منع التلاعب)
+    const role = session.role === "manager"
+      ? "manager"
+      : ["hr", "admin"].includes(session.role) ? "hr" : null;
+
+    if (!role) return NextResponse.json({ error: "غير مصرح" }, { status: 403 });
 
     // جلب الطلب الحالي مع بيانات الموظف
     const existing = await prisma.request.findUnique({

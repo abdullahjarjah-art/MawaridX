@@ -95,6 +95,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         iban: nullIfEmpty(body.iban),
         nationality: body.nationality ?? "saudi",
         iqamaExpiry: body.iqamaExpiry ? new Date(body.iqamaExpiry) : null,
+        costGosiOverride:       body.costGosiOverride       !== undefined ? (body.costGosiOverride === null || body.costGosiOverride === "" ? null : parseFloat(body.costGosiOverride)) : undefined,
+        costIqamaOverride:      body.costIqamaOverride      !== undefined ? (body.costIqamaOverride === null || body.costIqamaOverride === "" ? null : parseFloat(body.costIqamaOverride)) : undefined,
+        costWorkPermitOverride: body.costWorkPermitOverride !== undefined ? (body.costWorkPermitOverride === null || body.costWorkPermitOverride === "" ? null : parseFloat(body.costWorkPermitOverride)) : undefined,
+        costExpatLevyOverride:  body.costExpatLevyOverride  !== undefined ? (body.costExpatLevyOverride === null || body.costExpatLevyOverride === "" ? null : parseFloat(body.costExpatLevyOverride)) : undefined,
+        costMedicalInsurance:   body.costMedicalInsurance   !== undefined ? (body.costMedicalInsurance === null || body.costMedicalInsurance === "" ? null : parseFloat(body.costMedicalInsurance)) : undefined,
+        costOtherAnnual:        body.costOtherAnnual        !== undefined ? (body.costOtherAnnual === null || body.costOtherAnnual === "" ? null : parseFloat(body.costOtherAnnual)) : undefined,
         workLocationId: nullIfEmpty(body.workLocationId),
         multiLocation: body.multiLocation === true || body.multiLocation === "true",
       },
@@ -113,4 +119,29 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   await prisma.employee.delete({ where: { id } });
   return NextResponse.json({ success: true });
+}
+
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const session = await getSession();
+    if (!session || !["admin", "hr"].includes(session.role)) {
+      return NextResponse.json({ error: "غير مصرح" }, { status: 403 });
+    }
+    const { id } = await params;
+    const body = await req.json();
+    const parseNullable = (v: unknown): number | null =>
+      v === null || v === "" || v === undefined ? null : parseFloat(String(v));
+
+    const data: Record<string, number | null> = {};
+    const costKeys = ["costGosiOverride","costIqamaOverride","costWorkPermitOverride","costExpatLevyOverride","costMedicalInsurance","costOtherAnnual"] as const;
+    for (const key of costKeys) {
+      if (key in body) data[key] = parseNullable(body[key]);
+    }
+
+    const employee = await prisma.employee.update({ where: { id }, data });
+    return NextResponse.json(employee);
+  } catch (err) {
+    console.error("PATCH employee cost error:", err);
+    return NextResponse.json({ error: "حدث خطأ" }, { status: 500 });
+  }
 }

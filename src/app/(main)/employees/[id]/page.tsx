@@ -15,7 +15,7 @@ import {
   Package, CalendarDays, Plane, Monitor, Plus, Trash2, CheckCircle2, XCircle,
   Clock, FileText, Upload, Eye, Download, File, ImageIcon, AlertTriangle,
   Camera, RefreshCw, Send, BanIcon, ShieldAlert, FileSpreadsheet, BadgeCheck,
-  Scroll,
+  Scroll, TrendingUp,
 } from "lucide-react";
 
 import { EmployeeAvatar } from "@/components/employee-avatar";
@@ -52,8 +52,15 @@ type Employee = {
   birthDate?: string; gender?: string; maritalStatus?: string; address?: string; city?: string;
   jobTitle?: string; position: string; department?: string; employmentType: string;
   startDate: string; endDate?: string; status: string; nationality?: string;
-  basicSalary: number; bankName?: string; iban?: string;
+  basicSalary: number; housingAllowance: number; transportAllowance: number; otherAllowance: number;
+  bankName?: string; iban?: string;
   multiLocation?: boolean;
+  costGosiOverride?: number | null;
+  costIqamaOverride?: number | null;
+  costWorkPermitOverride?: number | null;
+  costExpatLevyOverride?: number | null;
+  costMedicalInsurance?: number | null;
+  costOtherAnnual?: number | null;
   manager?: { id: string; firstName: string; lastName: string } | null;
   subordinates?: { id: string; firstName: string; lastName: string; jobTitle?: string; photo?: string | null }[];
   attendances?: { id: string; date: string; status: string; checkIn?: string; checkOut?: string; workHours?: number }[];
@@ -100,6 +107,171 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label:
 
 const emptyCustodyForm = { type: "equipment", title: "", description: "", quantity: "", unit: "" };
 const emptyDocForm = { type: "other", name: "", expiryDate: "", notes: "" };
+
+// ── حساب تكاليف الموظف ──
+type CostKey = "costGosiOverride" | "costIqamaOverride" | "costWorkPermitOverride" | "costExpatLevyOverride" | "costMedicalInsurance" | "costOtherAnnual";
+
+type CostEmp = {
+  id: string;
+  basicSalary: number;
+  housingAllowance: number;
+  transportAllowance: number;
+  otherAllowance: number;
+  nationality: string;
+  costGosiOverride?: number | null;
+  costIqamaOverride?: number | null;
+  costWorkPermitOverride?: number | null;
+  costExpatLevyOverride?: number | null;
+  costMedicalInsurance?: number | null;
+  costOtherAnnual?: number | null;
+};
+
+function calcCosts(emp: CostEmp) {
+  const isSaudi = emp.nationality === "saudi";
+  const basic   = emp.basicSalary ?? 0;
+  return {
+    gosiAnnual:       emp.costGosiOverride       ?? (isSaudi ? basic * 0.09 * 12 : basic * 0.02 * 12),
+    iqamaAnnual:      emp.costIqamaOverride      ?? (isSaudi ? 0 : 650),
+    workPermitAnnual: emp.costWorkPermitOverride  ?? (isSaudi ? 0 : 400),
+    expatLevyAnnual:  emp.costExpatLevyOverride   ?? (isSaudi ? 0 : 9600),
+    medicalAnnual:    emp.costMedicalInsurance    ?? 0,
+    otherAnnual:      emp.costOtherAnnual         ?? 0,
+  };
+}
+
+function EmployeeCostCard({ emp, onUpdate }: { emp: CostEmp; onUpdate: (u: Partial<CostEmp>) => void }) {
+  const [editing, setEditing] = useState<CostKey | null>(null);
+  const [inputVal, setInputVal] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const isSaudi  = emp.nationality === "saudi";
+  const totalSal = (emp.basicSalary ?? 0) + (emp.housingAllowance ?? 0) + (emp.transportAllowance ?? 0) + (emp.otherAllowance ?? 0);
+  const costs    = calcCosts(emp);
+  const totalAnnualExtra = costs.gosiAnnual + costs.iqamaAnnual + costs.workPermitAnnual + costs.expatLevyAnnual + costs.medicalAnnual + costs.otherAnnual;
+  const totalMonthly = totalSal + totalAnnualExtra / 12;
+  const totalAnnual  = totalSal * 12 + totalAnnualExtra;
+
+  const fmt  = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  const fmt2 = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const startEdit = (key: CostKey, cur: number) => { setEditing(key); setInputVal(String(Math.round(cur))); };
+  const cancelEdit = () => { setEditing(null); setInputVal(""); };
+
+  const saveEdit = async (key: CostKey) => {
+    setSaving(true);
+    const val = inputVal === "" ? null : parseFloat(inputVal);
+    try {
+      const res = await fetch(`/api/employees/${emp.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: val }),
+      });
+      if (res.ok) { const u = await res.json(); onUpdate({ [key]: u[key] }); }
+    } finally { setSaving(false); cancelEdit(); }
+  };
+
+  const resetDefault = async (key: CostKey) => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/employees/${emp.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: null }),
+      });
+      if (res.ok) onUpdate({ [key]: null });
+    } finally { setSaving(false); }
+  };
+
+  const rows: { key: CostKey; label: string; annual: number; overridden: boolean; defaultLabel: string; show: boolean; manual?: boolean }[] = [
+    { key: "costGosiOverride",       label: "GOSI — صاحب العمل",      annual: costs.gosiAnnual,       overridden: emp.costGosiOverride != null,       defaultLabel: isSaudi ? "9% من الأساسي" : "2% من الأساسي", show: true },
+    { key: "costIqamaOverride",      label: "تجديد الإقامة",           annual: costs.iqamaAnnual,      overridden: emp.costIqamaOverride != null,      defaultLabel: "650 ر.س/سنة",  show: !isSaudi },
+    { key: "costWorkPermitOverride", label: "رسوم كرت العمل",          annual: costs.workPermitAnnual, overridden: emp.costWorkPermitOverride != null,  defaultLabel: "400 ر.س/سنة",  show: !isSaudi },
+    { key: "costExpatLevyOverride",  label: "رسوم العمالة الوافدة",    annual: costs.expatLevyAnnual,  overridden: emp.costExpatLevyOverride != null,   defaultLabel: "9,600 ر.س/سنة", show: !isSaudi },
+    { key: "costMedicalInsurance",   label: "التأمين الطبي",           annual: costs.medicalAnnual,    overridden: (emp.costMedicalInsurance ?? 0) > 0, defaultLabel: "أدخل يدوياً", show: true, manual: true },
+    { key: "costOtherAnnual",        label: "تكاليف أخرى",             annual: costs.otherAnnual,      overridden: (emp.costOtherAnnual ?? 0) > 0,     defaultLabel: "أدخل يدوياً", show: true, manual: true },
+  ];
+
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <TrendingUp className="h-5 w-5 text-emerald-500" />
+          <h3 className="font-semibold text-sm">تكلفة الموظف على الشركة</h3>
+        </div>
+
+        {/* الراتب والبدلات */}
+        <div className="flex items-center justify-between py-2.5 border-b border-gray-100 dark:border-gray-700">
+          <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-500 px-2 py-0.5 rounded-full">تلقائي</span>
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-gray-400">{fmt2(totalSal)} / شهر</span>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-36 text-right">الراتب + البدلات</span>
+          </div>
+        </div>
+
+        {/* بنود التكاليف */}
+        {rows.filter(r => r.show).map(row => (
+          <div key={row.key} className="flex items-center justify-between py-2.5 border-b border-gray-50 dark:border-gray-700/40 min-h-[44px]">
+            {editing === row.key ? (
+              <div className="flex items-center gap-2 w-full">
+                <button onClick={cancelEdit} className="text-xs text-gray-400 hover:text-gray-600 shrink-0">إلغاء</button>
+                <button onClick={() => saveEdit(row.key)} disabled={saving}
+                  className="text-xs bg-gray-900 dark:bg-gray-600 text-white px-3 py-1.5 rounded-md hover:bg-gray-700 disabled:opacity-50 shrink-0">
+                  {saving ? "..." : "حفظ"}
+                </button>
+                <input type="number" min="0" value={inputVal} onChange={e => setInputVal(e.target.value)}
+                  placeholder="المبلغ السنوي بالريال"
+                  className="flex-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 bg-white dark:bg-gray-800 text-right"
+                  autoFocus
+                  onKeyDown={e => { if (e.key === "Enter") saveEdit(row.key); if (e.key === "Escape") cancelEdit(); }} />
+                <span className="text-xs text-gray-400 shrink-0">ر.س/سنة</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-1.5">
+                  {!row.manual && row.overridden && (
+                    <button onClick={() => resetDefault(row.key)} disabled={saving}
+                      className="text-xs text-gray-300 hover:text-red-400 transition-colors" title="إعادة للقيمة التلقائية">↺</button>
+                  )}
+                  <button onClick={() => startEdit(row.key, row.annual)}
+                    className="text-xs text-sky-500 hover:text-sky-700 transition-colors">✏️</button>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                    row.manual ? "bg-gray-100 dark:bg-gray-700 text-gray-400"
+                    : row.overridden ? "bg-amber-50 dark:bg-amber-900/20 text-amber-600"
+                    : "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600"
+                  }`}>
+                    {row.manual ? "يدوي" : row.overridden ? "مخصص" : "تلقائي"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-xs text-gray-400 tabular-nums">
+                    {row.annual > 0 ? `${fmt2(row.annual / 12)} / شهر` : "—"}
+                  </span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-36 text-right">{row.label}</span>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+
+        {/* الإجمالي */}
+        <div className="mt-4 pt-3 border-t-2 border-gray-200 dark:border-gray-600 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-right">
+              <span className="text-xl font-black text-gray-900 dark:text-white tabular-nums">{fmt2(totalMonthly)}</span>
+              <span className="text-xs text-gray-400 mr-1">ر.س / شهر</span>
+            </div>
+            <span className="text-sm text-gray-500 dark:text-gray-400">إجمالي التكلفة الشهرية</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="text-right">
+              <span className="text-sm font-bold text-gray-600 dark:text-gray-300 tabular-nums">{fmt(totalAnnual)}</span>
+              <span className="text-xs text-gray-400 mr-1">ر.س / سنة</span>
+            </div>
+            <span className="text-xs text-gray-400">إجمالي سنوي</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function EmployeeProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -811,6 +983,13 @@ export default function EmployeeProfilePage() {
               )}
             </CardContent>
           </Card>
+
+          {emp && (
+            <EmployeeCostCard
+              emp={emp as CostEmp}
+              onUpdate={(updated) => setEmp(prev => prev ? { ...prev, ...updated } : prev)}
+            />
+          )}
 
           <Card>
             <CardContent className="p-5">

@@ -7,7 +7,10 @@ export type SalarySlipData = {
   month: number;
   year: number;
   basicSalary: number;
-  allowances: number;
+  housingAllowance?: number;
+  transportAllowance?: number;
+  otherAllowance?: number;
+  allowances: number;          // مجموع البدلات (fallback لو لم تُمرَّر التفاصيل)
   bonus: number;
   overtimePay: number;
   deductions: number;
@@ -17,6 +20,8 @@ export type SalarySlipData = {
   status: string;
   paidAt?: string;
   notes?: string;
+  bankName?: string;
+  iban?: string;
   companyName?: string;
 };
 
@@ -30,204 +35,155 @@ function fmt(n: number) {
 }
 
 export function generateSalaryPDF(data: SalarySlipData): void {
-  const company = data.companyName || "MawaridX HR";
-  const monthName = monthNames[data.month - 1];
-  const gosiEmp = data.gosiEmployee ?? 0;
-  const gosiEer = data.gosiEmployer ?? 0;
-  const isSaudi = (data.nationality ?? "non_saudi") === "saudi";
+  const company    = data.companyName || "MawaridX HR";
+  const monthName  = monthNames[data.month - 1];
+  const gosiEmp    = data.gosiEmployee ?? 0;
+  const gosiEer    = data.gosiEmployer ?? 0;
+  const isSaudi    = (data.nationality ?? "non_saudi") === "saudi";
+  const issueDate  = new Date().toLocaleDateString("ar-SA");
+  const issueTime  = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
+
+  // ── بناء صفوف الإيرادات ──
+  const earningRows: { label: string; amount: number }[] = [
+    { label: "الراتب الأساسي",   amount: data.basicSalary },
+  ];
+  if ((data.housingAllowance ?? 0) > 0) {
+    earningRows.push({ label: "بدل سكن",        amount: data.housingAllowance! });
+  }
+  if ((data.transportAllowance ?? 0) > 0) {
+    earningRows.push({ label: "بدل مواصلات",    amount: data.transportAllowance! });
+  }
+  if ((data.otherAllowance ?? 0) > 0) {
+    earningRows.push({ label: "بدلات أخرى",     amount: data.otherAllowance! });
+  }
+  // لو لم تُمرَّر التفاصيل لكن يوجد مجموع بدلات
+  if (
+    !data.housingAllowance && !data.transportAllowance && !data.otherAllowance
+    && data.allowances > 0
+  ) {
+    earningRows.push({ label: "البدلات",         amount: data.allowances });
+  }
+  if (data.bonus > 0)       earningRows.push({ label: "مكافآت",         amount: data.bonus });
+  if (data.overtimePay > 0) earningRows.push({ label: "العمل الإضافي",  amount: data.overtimePay });
+
   const totalEarnings = data.basicSalary + data.allowances + data.bonus + data.overtimePay;
+
+  // ── بناء صفوف الخصومات ──
+  const deductionRows: { label: string; amount: number }[] = [];
+  if (data.deductions > 0) deductionRows.push({ label: "خصومات أخرى",                   amount: data.deductions });
+  if (gosiEmp > 0)         deductionRows.push({ label: `التأمينات (GOSI) — نصيب الموظف`, amount: gosiEmp });
+
   const totalDeductions = data.deductions + gosiEmp;
+
+  // ── مطابقة الصفوف بين الجانبين ──
+  const rowCount = Math.max(earningRows.length, deductionRows.length);
+  const rows: { eLabel: string; eAmt: string; dLabel: string; dAmt: string }[] = [];
+  for (let i = 0; i < rowCount; i++) {
+    rows.push({
+      eLabel: earningRows[i]?.label   ?? "",
+      eAmt:   earningRows[i]  ? fmt(earningRows[i].amount)   : "",
+      dLabel: deductionRows[i]?.label ?? "",
+      dAmt:   deductionRows[i] ? fmt(deductionRows[i].amount) : "",
+    });
+  }
+
+  // ── قسم البنك ──
+  const bankSection = (data.bankName || data.iban) ? `
+    <table class="bank-table">
+      <tr>
+        <td><span class="bl">طريقة الدفع</span><span class="bv">بنك</span></td>
+        <td><span class="bl">اسم البنك</span><span class="bv">${data.bankName || "—"}</span></td>
+      </tr>
+      <tr>
+        <td><span class="bl">رقم الآيبان</span><span class="bv ltr">${data.iban || "—"}</span></td>
+        <td><span class="bl">نوع الدفع</span><span class="bv">Bank Account</span></td>
+      </tr>
+    </table>` : "";
+
+  // ── ملاحظات GOSI ──
+  const gosiNote = gosiEmp > 0 ? `
+    <div class="gosi-note">
+      التأمينات الاجتماعية (GOSI) — ${isSaudi ? "سعودي" : "غير سعودي"} &nbsp;|&nbsp;
+      وعاء الاشتراك: ${fmt(data.basicSalary)} ر.س &nbsp;|&nbsp;
+      نصيب الموظف: ${fmt(gosiEmp)} ر.س (${isSaudi ? "9%" : "معفى"}) &nbsp;|&nbsp;
+      نصيب صاحب العمل: ${fmt(gosiEer)} ر.س (${isSaudi ? "9%" : "2%"})
+    </div>` : "";
+
   const statusLabel = data.status === "paid" ? "مصروف ✓" : "معلق";
-  const paidDateStr = data.paidAt
-    ? `تاريخ الصرف: ${new Date(data.paidAt).toLocaleDateString("ar-SA")}`
-    : "";
+  const notesHtml = data.notes ? `<div class="notes">ملاحظة: ${data.notes}</div>` : "";
 
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8" />
-  <title>كشف راتب — ${data.employeeName} — ${monthName} ${data.year}</title>
+  <meta charset="utf-8"/>
+  <title>تفصيل الراتب — ${data.employeeName} — ${monthName} ${data.year}</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
-      background: #f1f5f9;
-      color: #1e293b;
-      direction: rtl;
-    }
-    .page {
-      max-width: 780px;
-      margin: 30px auto;
-      background: #fff;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 4px 24px rgba(0,0,0,.12);
-    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f4f4f4;color:#1a1a1a;direction:rtl;font-size:13px}
 
-    /* Header */
-    .header {
-      background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-      color: #fff;
-      padding: 36px 40px 28px;
-      text-align: center;
-    }
-    .header .logo { font-size: 26px; font-weight: 800; letter-spacing: 1px; margin-bottom: 6px; }
-    .header .subtitle { font-size: 14px; opacity: .85; margin-bottom: 4px; }
-    .header .period {
-      display: inline-block;
-      background: rgba(255,255,255,.2);
-      border-radius: 20px;
-      padding: 4px 18px;
-      font-size: 13px;
-      margin-top: 6px;
-    }
+    .print-bar{text-align:center;padding:14px;background:#e8e8e8}
+    .print-btn{background:#1a1a1a;color:#fff;border:none;padding:10px 32px;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
 
-    /* Employee Info */
-    .emp-box {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0;
-      border-bottom: 1px solid #e2e8f0;
-      background: #f8fafc;
-    }
-    .emp-item {
-      padding: 14px 24px;
-      border-left: 1px solid #e2e8f0;
-    }
-    .emp-item:nth-child(2n) { border-left: none; }
-    .emp-label { font-size: 11px; color: #94a3b8; margin-bottom: 3px; }
-    .emp-value { font-size: 14px; font-weight: 700; color: #1e293b; }
+    .page{max-width:760px;margin:20px auto;background:#fff;border:1px solid #ccc;padding:32px 36px}
 
-    /* Body */
-    .body { padding: 28px 32px; }
+    /* ── Header ── */
+    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;padding-bottom:14px;border-bottom:2px solid #222}
+    .co-name{font-size:17px;font-weight:800;margin-bottom:3px}
+    .co-sub{font-size:11px;color:#666}
+    .sys-info{text-align:left;font-size:11px;color:#555;line-height:1.7}
+    .sys-info strong{color:#1a1a1a;display:block;margin-bottom:2px}
 
-    /* Tables row */
-    .tables-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 22px; }
+    /* ── Title ── */
+    .title-area{text-align:center;margin:14px 0 18px}
+    .title-area h1{font-size:30px;font-weight:900;letter-spacing:1px}
+    .title-area .period{font-size:15px;color:#444;margin-top:4px}
 
-    .section-title {
-      font-size: 13px;
-      font-weight: 700;
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .section-title.earnings { color: #1d4ed8; }
-    .section-title.deductions { color: #dc2626; }
-    .section-title .dot { width: 8px; height: 8px; border-radius: 50%; }
-    .section-title.earnings .dot { background: #1d4ed8; }
-    .section-title.deductions .dot { background: #dc2626; }
+    /* ── Employee Info ── */
+    .emp-info{text-align:right;margin-bottom:6px;line-height:2;font-size:13px;color:#333}
+    .emp-info b{color:#1a1a1a}
 
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    thead th {
-      padding: 9px 12px;
-      font-size: 11px;
-      font-weight: 600;
-      text-align: right;
-    }
-    .earnings-table thead { background: #1d4ed8; color: #fff; }
-    .deductions-table thead { background: #dc2626; color: #fff; }
-    tbody tr { border-bottom: 1px solid #f1f5f9; }
-    tbody tr:last-child { border-bottom: none; }
-    tbody td { padding: 9px 12px; color: #475569; }
-    tbody td:last-child { text-align: left; font-weight: 600; color: #1e293b; }
-    tfoot td {
-      padding: 9px 12px;
-      font-weight: 700;
-      font-size: 12px;
-    }
-    .earnings-table tfoot { background: #dbeafe; color: #1e3a8a; }
-    .deductions-table tfoot { background: #fee2e2; color: #7f1d1d; }
-    tfoot td:last-child { text-align: left; }
+    /* ── Timestamp ── */
+    .ts{font-size:11px;color:#777;margin-bottom:14px}
 
-    /* GOSI Box */
-    .gosi-box {
-      background: #f0fdfa;
-      border: 1px solid #99f6e4;
-      border-radius: 10px;
-      padding: 14px 18px;
-      margin-bottom: 16px;
-    }
-    .gosi-title { font-size: 13px; font-weight: 700; color: #0f766e; margin-bottom: 10px; }
-    .gosi-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-    .gosi-item { text-align: center; }
-    .gosi-label { font-size: 10px; color: #64748b; margin-bottom: 3px; }
-    .gosi-value { font-size: 14px; font-weight: 700; color: #0f766e; }
-    .gosi-sub { font-size: 10px; color: #94a3b8; }
+    /* ── Main Table ── */
+    .main-table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:13px}
+    .main-table th{background:#2a2a2a;color:#fff;padding:9px 12px;text-align:right;font-size:12px;font-weight:700}
+    .main-table th.sep{border-right:2px solid #555}
+    .main-table td{padding:8px 12px;border-bottom:1px solid #ebebeb;vertical-align:middle}
+    .main-table td.sep{border-right:1px solid #ddd}
+    .main-table td.amt{font-weight:600;white-space:nowrap;color:#111}
+    .main-table .total td{background:#f0f0f0;font-weight:800;border-top:1px solid #999;border-bottom:1px solid #999;font-size:12px}
+    .main-table .net td{background:#1a1a1a;color:#fff;font-size:14px;font-weight:800;padding:12px;border:none}
+    .main-table .net td.right{letter-spacing:.5px}
 
-    /* Net Salary */
-    .net-box {
-      background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-      border-radius: 12px;
-      padding: 20px 28px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      color: #fff;
-      margin-bottom: 18px;
-    }
-    .net-label { font-size: 14px; opacity: .9; }
-    .net-title { font-size: 18px; font-weight: 800; }
-    .net-amount { font-size: 28px; font-weight: 900; }
-    .net-currency { font-size: 14px; opacity: .85; margin-top: 4px; }
+    /* ── Bank Table ── */
+    .bank-table{width:100%;border-collapse:collapse;border:1px solid #ccc;margin-bottom:16px;font-size:12px}
+    .bank-table td{padding:9px 14px;border-bottom:1px solid #e5e5e5;border-left:1px solid #e5e5e5;vertical-align:top;width:50%}
+    .bank-table tr:last-child td{border-bottom:none}
+    .bl{display:block;font-size:10px;color:#888;margin-bottom:2px}
+    .bv{display:block;font-weight:700;color:#1a1a1a}
+    .ltr{direction:ltr;text-align:right;unicode-bidi:embed}
 
-    /* Status */
-    .status-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      background: #f8fafc;
-      border-radius: 10px;
-      margin-bottom: 18px;
-      border: 1px solid #e2e8f0;
-    }
-    .status-badge {
-      font-weight: 700;
-      font-size: 13px;
-      padding: 4px 14px;
-      border-radius: 20px;
-    }
-    .status-paid { background: #dcfce7; color: #15803d; }
-    .status-pending { background: #fef3c7; color: #b45309; }
+    /* ── Status / GOSI ── */
+    .status-row{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f8f8f8;border:1px solid #e0e0e0;border-radius:4px;margin-bottom:10px;font-size:12px}
+    .sbadge{padding:3px 12px;border-radius:12px;font-weight:700;font-size:12px}
+    .spaid{background:#d1fae5;color:#065f46}
+    .spending{background:#fef3c7;color:#92400e}
+    .gosi-note{font-size:11px;color:#555;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;padding:8px 12px;margin-bottom:10px;line-height:1.7}
+    .notes{font-size:12px;color:#555;background:#fffbeb;border-right:3px solid #f59e0b;padding:8px 12px;margin-bottom:12px}
 
-    .notes { font-size: 12px; color: #64748b; padding: 10px 14px; background: #fffbeb; border-radius: 8px; border-right: 3px solid #fbbf24; margin-bottom: 16px; }
+    /* ── Signatures ── */
+    .sig-section{display:flex;justify-content:space-between;margin-top:36px}
+    .sig-box{text-align:center;font-size:12px;color:#555;flex:1}
+    .sig-line{height:40px;border-bottom:1px solid #888;margin:0 20px 6px}
 
-    /* Footer */
-    .footer {
-      border-top: 1px solid #e2e8f0;
-      padding: 16px 32px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #f8fafc;
-      font-size: 11px;
-      color: #94a3b8;
-    }
+    /* ── Footer ── */
+    .footer{text-align:center;font-size:10px;color:#aaa;margin-top:18px;padding-top:10px;border-top:1px solid #eee;display:flex;justify-content:space-between}
 
-    /* Print Button */
-    .print-bar {
-      text-align: center;
-      padding: 20px;
-      background: #f1f5f9;
-    }
-    .print-btn {
-      background: #1e40af;
-      color: #fff;
-      border: none;
-      padding: 12px 36px;
-      border-radius: 10px;
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      font-family: inherit;
-    }
-    .print-btn:hover { background: #1d4ed8; }
-
-    @media print {
-      body { background: #fff; }
-      .page { margin: 0; box-shadow: none; border-radius: 0; }
-      .print-bar { display: none; }
+    @media print{
+      body{background:#fff}
+      .page{margin:0;border:none;padding:24px}
+      .print-bar{display:none}
     }
   </style>
 </head>
@@ -237,125 +193,92 @@ export function generateSalaryPDF(data: SalarySlipData): void {
   </div>
 
   <div class="page">
+
     <!-- Header -->
     <div class="header">
-      <div class="logo">${company}</div>
-      <div class="subtitle">كشف الراتب الشهري</div>
+      <div>
+        <div class="co-name">${company}</div>
+        <div class="co-sub">المملكة العربية السعودية</div>
+      </div>
+      <div class="sys-info">
+        <strong>أنشئ بواسطة نظام MawaridX للموارد البشرية</strong>
+        ${issueDate}
+      </div>
+    </div>
+
+    <!-- Title -->
+    <div class="title-area">
+      <h1>تفصيل الراتب</h1>
       <div class="period">${monthName} ${data.year}</div>
     </div>
 
     <!-- Employee Info -->
-    <div class="emp-box">
-      <div class="emp-item">
-        <div class="emp-label">اسم الموظف</div>
-        <div class="emp-value">${data.employeeName}</div>
-      </div>
-      <div class="emp-item">
-        <div class="emp-label">الرقم الوظيفي</div>
-        <div class="emp-value">${data.employeeNumber}</div>
-      </div>
-      <div class="emp-item">
-        <div class="emp-label">المسمى الوظيفي</div>
-        <div class="emp-value">${data.jobTitle || "—"}</div>
-      </div>
-      <div class="emp-item">
-        <div class="emp-label">القسم</div>
-        <div class="emp-value">${data.department || "—"}</div>
-      </div>
+    <div class="emp-info">
+      <div>اسم الموظف: <b>${data.employeeName}</b></div>
+      <div>رقم الموظف: <b>${data.employeeNumber}</b></div>
+      ${data.jobTitle  ? `<div>المسمى الوظيفي: <b>${data.jobTitle}</b></div>` : ""}
+      ${data.department ? `<div>القسم: <b>${data.department}</b></div>` : ""}
+    </div>
+    <div class="ts">توقيع المستخدم: ${data.employeeNumber} | ${issueDate} ${issueTime}</div>
+
+    <!-- Main Table (الإيرادات | الخصومات جنب بعض) -->
+    <table class="main-table">
+      <thead>
+        <tr>
+          <th colspan="2">الإيرادات</th>
+          <th colspan="2" class="sep">الخصومات</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => `
+        <tr>
+          <td>${r.eLabel}</td>
+          <td class="amt">${r.eAmt}</td>
+          <td class="sep">${r.dLabel}</td>
+          <td class="amt">${r.dAmt}</td>
+        </tr>`).join("")}
+        <tr class="total">
+          <td>مجموع الإيرادات</td>
+          <td class="amt">${fmt(totalEarnings)}</td>
+          <td class="sep">مجموع الخصومات</td>
+          <td class="amt">${fmt(totalDeductions)}</td>
+        </tr>
+        <tr class="net">
+          <td colspan="2" class="right">صافي الراتب</td>
+          <td colspan="2" style="text-align:left">${fmt(data.netSalary)} sar</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Status -->
+    <div class="status-row">
+      <span>حالة الصرف${data.paidAt ? " — " + new Date(data.paidAt).toLocaleDateString("ar-SA") : ""}</span>
+      <span class="sbadge ${data.status === "paid" ? "spaid" : "spending"}">${statusLabel}</span>
     </div>
 
-    <div class="body">
-      <!-- Earnings & Deductions Tables -->
-      <div class="tables-row">
-        <!-- Earnings -->
-        <div>
-          <div class="section-title earnings">
-            <span class="dot"></span> المستحقات
-          </div>
-          <table class="earnings-table">
-            <thead>
-              <tr><th>البند</th><th>المبلغ (ر.س)</th></tr>
-            </thead>
-            <tbody>
-              <tr><td>الراتب الأساسي</td><td>${fmt(data.basicSalary)}</td></tr>
-              <tr><td>البدلات</td><td>${fmt(data.allowances)}</td></tr>
-              <tr><td>المكافآت</td><td>${fmt(data.bonus)}</td></tr>
-              <tr><td>العمل الإضافي</td><td>${fmt(data.overtimePay)}</td></tr>
-            </tbody>
-            <tfoot>
-              <tr><td>إجمالي المستحقات</td><td>${fmt(totalEarnings)}</td></tr>
-            </tfoot>
-          </table>
-        </div>
+    ${notesHtml}
 
-        <!-- Deductions -->
-        <div>
-          <div class="section-title deductions">
-            <span class="dot"></span> الخصومات
-          </div>
-          <table class="deductions-table">
-            <thead>
-              <tr><th>البند</th><th>المبلغ (ر.س)</th></tr>
-            </thead>
-            <tbody>
-              <tr><td>خصومات أخرى</td><td>${fmt(data.deductions)}</td></tr>
-              <tr><td>التأمينات (GOSI) — نصيب الموظف</td><td>${fmt(gosiEmp)}</td></tr>
-            </tbody>
-            <tfoot>
-              <tr><td>إجمالي الخصومات</td><td>${fmt(totalDeductions)}</td></tr>
-            </tfoot>
-          </table>
-        </div>
+    <!-- Bank Section -->
+    ${bankSection}
+
+    <!-- Signatures -->
+    <div class="sig-section">
+      <div class="sig-box">
+        <div class="sig-line"></div>
+        <div>توقيع المستخدم</div>
       </div>
-
-      <!-- GOSI Section -->
-      <div class="gosi-box">
-        <div class="gosi-title">🛡️ التأمينات الاجتماعية (GOSI) — ${isSaudi ? "سعودي" : "غير سعودي"}</div>
-        <div class="gosi-grid">
-          <div class="gosi-item">
-            <div class="gosi-label">وعاء الاشتراك</div>
-            <div class="gosi-value">${fmt(data.basicSalary)} ر.س</div>
-            <div class="gosi-sub">الراتب الأساسي</div>
-          </div>
-          <div class="gosi-item">
-            <div class="gosi-label">نصيب الموظف</div>
-            <div class="gosi-value">${fmt(gosiEmp)} ر.س</div>
-            <div class="gosi-sub">${isSaudi ? "9%" : "معفى"}</div>
-          </div>
-          <div class="gosi-item">
-            <div class="gosi-label">نصيب صاحب العمل</div>
-            <div class="gosi-value">${fmt(gosiEer)} ر.س</div>
-            <div class="gosi-sub">${isSaudi ? "9%" : "2% (أخطار مهنية)"}</div>
-          </div>
-        </div>
+      <div class="sig-box">
+        <div class="sig-line"></div>
+        <div>توقيع المدير</div>
       </div>
-
-      <!-- Net Salary -->
-      <div class="net-box">
-        <div>
-          <div class="net-label">صافي الراتب</div>
-          <div class="net-title">${monthName} ${data.year}</div>
-        </div>
-        <div style="text-align:left">
-          <div class="net-amount">${fmt(data.netSalary)}</div>
-          <div class="net-currency">ريال سعودي</div>
-        </div>
-      </div>
-
-      <!-- Status -->
-      <div class="status-row">
-        <span style="font-size:13px;color:#64748b">حالة الصرف ${paidDateStr ? "— " + paidDateStr : ""}</span>
-        <span class="status-badge ${data.status === "paid" ? "status-paid" : "status-pending"}">${statusLabel}</span>
-      </div>
-
-      ${data.notes ? `<div class="notes">ملاحظات: ${data.notes}</div>` : ""}
     </div>
 
     <!-- Footer -->
     <div class="footer">
       <span>تم إنشاء هذا المستند آلياً — لا يحتاج توقيعاً</span>
-      <span>تاريخ الإصدار: ${new Date().toLocaleDateString("ar-SA")}</span>
+      <span>تاريخ الإصدار: ${issueDate}</span>
     </div>
+
   </div>
 </body>
 </html>`;

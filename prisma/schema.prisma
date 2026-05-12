@@ -123,6 +123,14 @@ model Employee {
   nationality    String    @default("saudi") // saudi, non_saudi
   iqamaExpiry    DateTime?
 
+  // ── تكاليف الموظف على الشركة ──
+  costGosiOverride       Float?   // تجاوز GOSI صاحب العمل (سنوي)
+  costIqamaOverride      Float?   // تجاوز تجديد الإقامة (سنوي)
+  costWorkPermitOverride Float?   // تجاوز رسوم كرت العمل (سنوي)
+  costExpatLevyOverride  Float?   // تجاوز رسوم العمالة الوافدة (سنوي)
+  costMedicalInsurance   Float?   // التأمين الطبي (سنوي)
+  costOtherAnnual        Float?   // تكاليف أخرى (سنوي)
+
   workLocationId    String?
   workLocation      WorkLocation?          @relation(fields: [workLocationId], references: [id])
   multiLocation     Boolean                @default(false)
@@ -577,6 +585,21 @@ model Custody {
 // مستندات المنشأة
 // ==============================
 
+model Folder {
+  id        String    @id @default(cuid())
+  name      String
+  parentId  String?
+  parent    Folder?   @relation("FolderTree", fields: [parentId], references: [id])
+  children  Folder[]  @relation("FolderTree")
+  color     String    @default("#6b7280")
+  createdBy String
+  documents CompanyDocument[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([parentId])
+}
+
 model CompanyDocument {
   id               String   @id @default(cuid())
   title            String
@@ -600,10 +623,13 @@ model CompanyDocument {
   notifiedAt        DateTime?
 
   isActive         Boolean  @default(true)
+  folderId         String?
+  folder           Folder?  @relation(fields: [folderId], references: [id])
   createdBy        String
   creatorName      String?
 
   downloads        CompanyDocumentDownload[]
+  files            CompanyDocumentFile[]
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -619,6 +645,19 @@ model CompanyDocumentDownload {
 
   @@index([documentId])
   @@index([employeeId])
+}
+
+model CompanyDocumentFile {
+  id         String          @id @default(cuid())
+  documentId String
+  document   CompanyDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  fileUrl    String
+  fileName   String
+  fileSize   Int?
+  fileType   String?
+  createdAt  DateTime        @default(now())
+
+  @@index([documentId])
 }
 
 // ==============================
