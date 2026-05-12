@@ -23,7 +23,9 @@ function withSecurityHeaders(res: NextResponse): NextResponse {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data: https://fonts.gstatic.com",
-      "connect-src 'self'",
+      // In dev, ws:/wss: are required for Next.js HMR WebSocket (Fast Refresh).
+      // Without them, Chrome blocks the WebSocket → ChunkLoadError → reload loop.
+      `connect-src 'self'${isProd ? "" : " ws: wss:"}`,
       "frame-ancestors 'none'",
       "form-action 'self'",
       "base-uri 'self'",
@@ -66,5 +68,9 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Exclude ALL /_next/* internal paths (static assets, image optimizer,
+  // HMR WebSocket at /_next/webpack-hmr, SSE, etc.).
+  // Next.js automatically re-invokes proxy for /_next/data/* even when
+  // excluded here, so RSC page-data requests are still protected.
+  matcher: ["/((?!_next|favicon.ico).*)"],
 };

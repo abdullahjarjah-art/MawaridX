@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 import "./brand-theme.css";
@@ -42,14 +43,16 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl" className={`${geistSans.variable} ${plexArabic.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: `
+        {/* theme/lang init — beforeInteractive so it runs before React hydration
+            without triggering React 19's "script tag" warning */}
+        <Script id="theme-init" strategy="beforeInteractive">{`
           try {
-            const t = localStorage.getItem('hr_theme');
+            var t = localStorage.getItem('hr_theme');
             if (t === 'dark') document.documentElement.classList.add('dark');
-            const l = localStorage.getItem('hr_lang');
+            var l = localStorage.getItem('hr_lang');
             if (l === 'en') { document.documentElement.lang = 'en'; document.documentElement.dir = 'ltr'; }
-          } catch {}
-        ` }} />
+          } catch(e) {}
+        `}</Script>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="بوابة الموظف" />
