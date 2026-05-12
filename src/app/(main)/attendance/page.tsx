@@ -112,10 +112,17 @@ export default function AttendancePage() {
     }
   };
 
+  const fetchLeaves = async () => {
+    const params = new URLSearchParams({ month, year });
+    if (filterEmp !== "all") params.set("employeeId", filterEmp);
+    const res = await fetch(`/api/leaves?${params}`);
+    const data = await res.json();
+    setLeaves(Array.isArray(data) ? data : []);
+  };
+
   const fetchData = async () => {
-    const [empRes, leaveRes, settRes] = await Promise.all([
+    const [empRes, settRes] = await Promise.all([
       fetch("/api/employees?all=1"),
-      fetch("/api/leaves"),
       fetch("/api/settings/attendance"),
     ]);
     const sett = await settRes.json();
@@ -125,13 +132,14 @@ export default function AttendancePage() {
     }
     const empData = await empRes.json();
     setEmployees(Array.isArray(empData) ? empData : (empData.data ?? []));
-    setLeaves(await leaveRes.json());
-    fetchAttendance(1);
+    await Promise.all([fetchLeaves(), fetchAttendance(1)]);
     setAttPage(1);
   };
 
   useEffect(() => { fetchData(); }, [month, year]);
   useEffect(() => { fetchAttendance(attPage); }, [attPage]);
+  // لما يتغير الفلتر بالموظف → أعد جلب الإجازات
+  useEffect(() => { fetchLeaves(); }, [filterEmp, month, year]);
 
   const saveAttendance = async () => {
     setSaving(true);

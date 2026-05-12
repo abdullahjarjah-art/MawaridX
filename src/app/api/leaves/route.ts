@@ -16,9 +16,20 @@ export async function GET(req: NextRequest) {
   const employeeId = searchParams.get("employeeId");
   const status = searchParams.get("status");
 
+  const month = searchParams.get("month");
+  const year  = searchParams.get("year");
+
   const where: Record<string, unknown> = {};
   if (employeeId) where.employeeId = employeeId;
-  if (status) where.status = status;
+  if (status)     where.status = status;
+
+  // فلتر بالشهر: أي إجازة تتداخل مع الشهر المطلوب
+  if (month && year) {
+    const monthStart = new Date(Number(year), Number(month) - 1, 1);
+    const monthEnd   = new Date(Number(year), Number(month), 0, 23, 59, 59); // آخر يوم في الشهر
+    where.startDate = { lte: monthEnd };
+    where.endDate   = { gte: monthStart };
+  }
 
   const leaves = await prisma.leave.findMany({
     where,
