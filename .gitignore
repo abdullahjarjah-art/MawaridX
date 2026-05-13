@@ -91,3 +91,6 @@ check_users.mjs
 
 # Backups (mounted as Docker volume in production)
 /backups
+
+# Google Drive temp upload files
+.tmp.driveupload/

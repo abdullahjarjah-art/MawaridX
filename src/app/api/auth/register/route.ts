@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { signToken, setSessionCookie } from "@/lib/auth";
 import { isValidEmail, validatePassword } from "@/lib/validate";
 import { checkRateLimit, rateLimitResponse, getIP } from "@/lib/rate-limit";
-import { isSuperAdminEmail } from "@/lib/super-admin";
 
 export async function POST(req: NextRequest) {
   // Rate limit: 5 registrations / 15 min per IP
@@ -32,12 +31,7 @@ export async function POST(req: NextRequest) {
     const count = await prisma.employee.count();
     const employeeNumber = `EMP${String(count + 1).padStart(4, "0")}`;
 
-    // Bootstrap: the first user to register on a fresh tenant becomes
-    // an admin if their email is on the SUPER_ADMIN_EMAILS list. Without
-    // this, the proxy redirects them to /portal and they can never reach
-    // the admin tools needed to invite the rest of the team.
-    const userCount = await prisma.user.count();
-    const role = userCount === 0 && isSuperAdminEmail(email) ? "admin" : "employee";
+    const role = "employee";
 
     // إنشاء المستخدم أولاً
     const user = await prisma.user.create({

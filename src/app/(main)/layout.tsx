@@ -1,15 +1,10 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { isSuperAdminEmail } from "@/lib/super-admin";
 import { SidebarNav } from "@/components/sidebar-nav";
 
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
-
-  // السوبر أدمن ما يدخل قسم الموارد البشرية — يروح لوحته مباشرة
-  if (session && isSuperAdminEmail(session.email)) {
-    redirect("/super-admin");
-  }
+  if (!session) redirect("/login");
 
   return (
     <div className="min-h-screen mesh-bg relative">

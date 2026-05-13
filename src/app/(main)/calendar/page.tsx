@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronRight, ChevronLeft, CalendarDays, CheckCircle, XCircle, AlertTriangle, Clock, Palmtree } from "lucide-react";
+import { ChevronRight, ChevronLeft, CalendarDays, CheckCircle, XCircle, AlertTriangle, Clock, Palmtree, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLang } from "@/components/lang-provider";
 
@@ -21,23 +21,31 @@ type Leave = {
 };
 
 type Employee = { id: string; firstName: string; lastName: string; employeeNumber: string; department?: string };
+type Holiday  = { id: string; name: string; date: string; type: string; year: number };
 
 const statusColors: Record<string, string> = {
-  present: "bg-green-500",
-  late: "bg-yellow-500",
-  absent: "bg-red-500",
+  present:  "bg-green-500",
+  late:     "bg-yellow-500",
+  absent:   "bg-red-500",
   half_day: "bg-sky-500",
+};
+
+const holidayBg: Record<string, string> = {
+  official:  "bg-slate-200/80 dark:bg-slate-600/50",
+  religious: "bg-emerald-100/80 dark:bg-emerald-900/30",
+  national:  "bg-amber-100/80 dark:bg-amber-900/30",
 };
 
 export default function CalendarPage() {
   const { t, lang } = useLang();
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth());
-  const [year, setYear] = useState(now.getFullYear());
+  const [year, setYear]   = useState(now.getFullYear());
   const [attendance, setAttendance] = useState<Attendance[]>([]);
-  const [leaves, setLeaves] = useState<Leave[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [filterEmp, setFilterEmp] = useState("all");
+  const [leaves, setLeaves]         = useState<Leave[]>([]);
+  const [employees, setEmployees]   = useState<Employee[]>([]);
+  const [holidays, setHolidays]     = useState<Holiday[]>([]);
+  const [filterEmp, setFilterEmp]   = useState("all");
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   const leaveTypeMap: Record<string, string> = {
@@ -46,10 +54,7 @@ export default function CalendarPage() {
   };
 
   const statusLabels: Record<string, string> = {
-    present: t("حاضر"),
-    late: t("متأخر"),
-    absent: t("غائب"),
-    half_day: t("نصف دوام"),
+    present: t("حاضر"), late: t("متأخر"), absent: t("غائب"), half_day: t("نصف دوام"),
   };
 
   const dayNames = lang === "ar"
@@ -65,14 +70,16 @@ export default function CalendarPage() {
       fetch(`/api/attendance?month=${month + 1}&year=${year}`).then(r => r.json()),
       fetch("/api/leaves").then(r => r.json()),
       fetch("/api/employees").then(r => r.json()),
-    ]).then(([att, lv, emp]) => {
+      fetch(`/api/holidays?year=${year}`).then(r => r.json()),
+    ]).then(([att, lv, emp, hol]) => {
       setAttendance(Array.isArray(att) ? att : []);
       setLeaves(Array.isArray(lv) ? lv : []);
       setEmployees(Array.isArray(emp) ? emp : []);
+      setHolidays(Array.isArray(hol) ? hol : []);
     });
   }, [month, year]);
 
-  const firstDay = new Date(year, month, 1).getDay();
+  const firstDay    = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   const prevMonth = () => {
@@ -86,10 +93,14 @@ export default function CalendarPage() {
     setSelectedDay(null);
   };
 
+  // Holiday map: "YYYY-MM-DD" → Holiday
+  const holidayMap: Record<string, Holiday> = {};
+  holidays.forEach(h => { holidayMap[h.date.slice(0, 10)] = h; });
+
   const filteredAtt = filterEmp === "all" ? attendance : attendance.filter(a => a.employeeId === filterEmp);
 
   const monthStart = new Date(year, month, 1);
-  const monthEnd = new Date(year, month + 1, 0);
+  const monthEnd   = new Date(year, month + 1, 0);
   const activeLeaves = leaves.filter(l => {
     if (l.status !== "approved") return false;
     if (filterEmp !== "all" && l.employeeId !== filterEmp) return false;
@@ -98,9 +109,10 @@ export default function CalendarPage() {
     return ls <= monthEnd && le >= monthStart;
   });
 
-  const dayData: Record<number, { attendance: Attendance[]; leaves: Leave[] }> = {};
+  const dayData: Record<number, { attendance: Attendance[]; leaves: Leave[]; holiday: Holiday | null }> = {};
   for (let d = 1; d <= daysInMonth; d++) {
-    dayData[d] = { attendance: [], leaves: [] };
+    const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    dayData[d] = { attendance: [], leaves: [], holiday: holidayMap[key] ?? null };
   }
 
   filteredAtt.forEach(a => {
@@ -120,9 +132,13 @@ export default function CalendarPage() {
   });
 
   const presentCount = filteredAtt.filter(a => a.status === "present").length;
-  const lateCount = filteredAtt.filter(a => a.status === "late").length;
-  const absentCount = filteredAtt.filter(a => a.status === "absent").length;
-  const leaveCount = activeLeaves.length;
+  const lateCount    = filteredAtt.filter(a => a.status === "late").length;
+  const absentCount  = filteredAtt.filter(a => a.status === "absent").length;
+  const leaveCount   = activeLeaves.length;
+  const holidayCount = holidays.filter(h => {
+    const d = new Date(h.date);
+    return d.getMonth() === month && d.getFullYear() === year;
+  }).length;
 
   return (
     <div className="p-3 sm:p-6">
@@ -137,7 +153,10 @@ export default function CalendarPage() {
         <Select value={filterEmp} onValueChange={v => setFilterEmp(v ?? "all")}>
           <SelectTrigger className="w-52 h-8 sm:h-9 text-xs sm:text-sm">
             <SelectValue>
-              {filterEmp === "all" ? t("كل الموظفين") : (() => { const e = employees.find(x => x.id === filterEmp); return e ? `${e.firstName} ${e.lastName}` : t("كل الموظفين"); })()}
+              {filterEmp === "all" ? t("كل الموظفين") : (() => {
+                const e = employees.find(x => x.id === filterEmp);
+                return e ? `${e.firstName} ${e.lastName}` : t("كل الموظفين");
+              })()}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -150,7 +169,7 @@ export default function CalendarPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 sm:gap-4 mb-6">
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
             <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
@@ -195,9 +214,20 @@ export default function CalendarPage() {
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
+              <Star className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{holidayCount}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t("عطل رسمية")}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Calendar Navigation */}
+      {/* Calendar */}
       <Card className="mb-6">
         <CardContent className="p-0">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -215,9 +245,7 @@ export default function CalendarPage() {
           {/* Day names header */}
           <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700">
             {dayNames.map(d => (
-              <div key={d} className="px-2 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400">
-                {d}
-              </div>
+              <div key={d} className="px-2 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400">{d}</div>
             ))}
           </div>
 
@@ -230,10 +258,11 @@ export default function CalendarPage() {
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
               const data = dayData[day];
-              const isToday = day === now.getDate() && month === now.getMonth() && year === now.getFullYear();
+              const isToday   = day === now.getDate() && month === now.getMonth() && year === now.getFullYear();
               const dayOfWeek = new Date(year, month, day).getDay();
               const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
               const isSelected = selectedDay === day;
+              const holiday = data.holiday;
 
               return (
                 <div
@@ -241,20 +270,31 @@ export default function CalendarPage() {
                   onClick={() => setSelectedDay(isSelected ? null : day)}
                   className={cn(
                     "min-h-24 border-b border-l border-gray-100 dark:border-gray-700/50 p-1.5 cursor-pointer transition-colors",
-                    isToday && "bg-sky-50/70 dark:bg-sky-900/20",
-                    isWeekend && !isToday && "bg-red-50/40 dark:bg-red-900/10",
+                    holiday    ? (holidayBg[holiday.type] ?? holidayBg.official) :
+                    isToday    ? "bg-sky-50/70 dark:bg-sky-900/20" :
+                    isWeekend  ? "bg-red-50/40 dark:bg-red-900/10" :
+                               "hover:bg-gray-50 dark:hover:bg-gray-700/30",
                     isSelected && "ring-2 ring-sky-500 ring-inset",
-                    !isToday && !isWeekend && "hover:bg-gray-50 dark:hover:bg-gray-700/30"
                   )}
                 >
                   <div className={cn(
                     "text-sm font-medium mb-1",
-                    isToday ? "text-sky-600 dark:text-sky-400 font-bold" : "text-gray-700 dark:text-gray-300",
-                    isWeekend && "text-red-500 dark:text-red-400"
+                    isToday ? "text-sky-600 dark:text-sky-400 font-bold" :
+                    holiday  ? "text-gray-900 dark:text-white font-bold" :
+                    isWeekend ? "text-red-500 dark:text-red-400" :
+                               "text-gray-700 dark:text-gray-300",
                   )}>
                     {day}
                   </div>
 
+                  {/* Holiday name */}
+                  {holiday && (
+                    <div className="text-[9px] font-semibold text-gray-700 dark:text-gray-200 leading-tight line-clamp-2 mb-0.5">
+                      🎉 {holiday.name}
+                    </div>
+                  )}
+
+                  {/* Attendance dots */}
                   <div className="flex flex-wrap gap-0.5">
                     {data.attendance.map(a => (
                       <div
@@ -265,6 +305,7 @@ export default function CalendarPage() {
                     ))}
                   </div>
 
+                  {/* Leave badges */}
                   {data.leaves.length > 0 && (
                     <div className="mt-0.5">
                       {data.leaves.slice(0, 2).map((l, idx) => (
@@ -292,7 +333,22 @@ export default function CalendarPage() {
               {t("تفاصيل يوم")} {selectedDay} {monthNames[month]} {year}
             </h3>
 
-            {dayData[selectedDay].attendance.length === 0 && dayData[selectedDay].leaves.length === 0 ? (
+            {/* Holiday banner */}
+            {dayData[selectedDay].holiday && (
+              <div className="mb-4 flex items-center gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl px-4 py-3">
+                <Star className="h-5 w-5 text-amber-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                    🎉 {dayData[selectedDay].holiday!.name}
+                  </p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    {{official:"عطلة رسمية", religious:"عطلة دينية", national:"عطلة وطنية"}[dayData[selectedDay].holiday!.type] ?? "عطلة رسمية"}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {dayData[selectedDay].attendance.length === 0 && dayData[selectedDay].leaves.length === 0 && !dayData[selectedDay].holiday ? (
               <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">{t("لا توجد سجلات لهذا اليوم")}</p>
             ) : (
               <div className="space-y-4">
@@ -314,9 +370,9 @@ export default function CalendarPage() {
                           <div className="text-left">
                             <span className={cn(
                               "text-xs px-2 py-1 rounded-full font-medium",
-                              a.status === "present" && "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
-                              a.status === "late" && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
-                              a.status === "absent" && "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+                              a.status === "present"  && "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+                              a.status === "late"     && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
+                              a.status === "absent"   && "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
                               a.status === "half_day" && "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
                             )}>
                               {statusLabels[a.status] ?? a.status}
@@ -369,6 +425,8 @@ export default function CalendarPage() {
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> {t("غائب")}</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-sky-500" /> {t("نصف دوام")}</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-purple-500" /> {t("إجازة")}</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-200" /> {t("عطلة رسمية")}</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-200" /> {t("عطلة دينية")}</span>
       </div>
     </div>
   );

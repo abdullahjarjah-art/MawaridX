@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { isSuperAdminEmail } from "@/lib/super-admin";
 
 export async function GET() {
   const session = await getSession();
@@ -31,7 +30,6 @@ export async function GET() {
     id: user.id,
     email: user.email,
     role: user.role,
-    isSuperAdmin: isSuperAdminEmail(user.email),
     employee: user.employee,
   });
 }

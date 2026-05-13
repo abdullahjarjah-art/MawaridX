@@ -38,5 +38,5 @@ export async function POST(req: NextRequest) {
     data: { userId: entry.userId, userName: entry.email, action: "login_success_2fa", entity: "auth", details: `from ip=${ip}` },
   }).catch(() => {});
 
-  return NextResponse.json({ isSuperAdmin: true });
+  return NextResponse.json({ success: true, role: entry.role });
 }

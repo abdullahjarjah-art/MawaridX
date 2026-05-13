@@ -44,7 +44,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       .then((r) => r.json())
       .then((data) => {
         if (data.error) { router.push("/login"); return; }
-        if (data.isSuperAdmin) { router.push("/super-admin"); return; }
         if (data.role !== "employee") { router.push("/dashboard"); return; }
         setUser(data);
       });

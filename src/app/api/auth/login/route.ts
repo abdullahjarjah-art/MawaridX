@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signToken, setSessionCookie } from "@/lib/auth";
-import { isSuperAdminEmail } from "@/lib/super-admin";
 import { checkRateLimit, rateLimitResponse, getIP, LIMITS } from "@/lib/rate-limit";
-import { createOtp } from "@/lib/otp";
-import { sendOtpEmail, sendAccountLockedEmail } from "@/lib/email";
+import { sendAccountLockedEmail } from "@/lib/email";
 
 // ── Account lockout policy ──
 const MAX_FAILED_ATTEMPTS = 5;
@@ -84,16 +82,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // ── 2FA: Super admin gets OTP via email (unless bypassed for demo) ──
-    if (isSuperAdminEmail(user.email) && process.env.BYPASS_2FA !== "true") {
-      const { code } = createOtp(user.id, user.email, user.role, user.employee?.id);
-      sendOtpEmail(user.email, code).catch(() => {});
-      const [local, domain] = user.email.split("@");
-      const maskedEmail = `${local.slice(0, 2)}***@${domain}`;
-      await logAudit(user.id, user.email, "login_otp_sent", `from ip=${ip}`);
-      return NextResponse.json({ require2fa: true, userId: user.id, maskedEmail });
-    }
-
     const token = await signToken({
       userId: user.id,
       email: user.email,
@@ -109,7 +97,6 @@ export async function POST(req: NextRequest) {
       email: user.email,
       role: user.role,
       employeeId: user.employee?.id,
-      isSuperAdmin: false,
     });
   } catch (err) {
     console.error("Login error:", err);
