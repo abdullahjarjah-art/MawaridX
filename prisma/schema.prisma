@@ -186,14 +186,19 @@ model Shift {
 }
 
 model EmployeeShift {
-  id         String    @id @default(cuid())
-  employeeId String
-  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  shiftId    String
-  shift      Shift     @relation(fields: [shiftId], references: [id], onDelete: Cascade)
-  startDate  DateTime  @default(now())
-  endDate    DateTime?
-  createdAt  DateTime  @default(now())
+  id                  String    @id @default(cuid())
+  employeeId          String
+  employee            Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  shiftId             String
+  shift               Shift     @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  startDate           DateTime  @default(now())
+  endDate             DateTime?
+  // استثناء: ساعات مخصصة تتجاوز أوقات الشيفت الأساسي
+  customCheckInTime   String?   // "07:30" — يتجاوز checkInTime للشيفت
+  customCheckOutTime  String?   // "16:30" — يتجاوز checkOutTime للشيفت
+  customBreakMinutes  Int?      // يتجاوز breakMinutes للشيفت
+  exceptionNote       String?   // ملاحظة سبب الاستثناء
+  createdAt           DateTime  @default(now())
 
   @@unique([employeeId, shiftId])
   @@index([employeeId])

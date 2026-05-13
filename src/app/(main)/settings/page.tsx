@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin, Save, Clock, Timer, Mail, Send, ArrowLeft, CalendarCheck, RefreshCw, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, Users, User, Database, Download, Trash2, ShieldCheck } from "lucide-react";
+import { MapPin, Save, Clock, Mail, Send, ArrowLeft, CalendarCheck, RefreshCw, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, Users, User, Database, Download, Trash2, ShieldCheck } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
 import { useLang } from "@/components/lang-provider";
@@ -14,21 +14,10 @@ type SmtpSettings = {
   smtp_host: string; smtp_port: string; smtp_secure: string;
   smtp_user: string; smtp_pass: string; smtp_from: string; smtp_enabled: string;
 };
-type AttendanceSettings = {
-  type: "fixed" | "flexible";
-  checkInTime: string;
-  checkOutTime: string;
-  requiredHours: number;
-  lateToleranceMinutes: number;
-};
-
 const DEFAULT_SMTP: SmtpSettings = { smtp_host: "", smtp_port: "587", smtp_secure: "false", smtp_user: "", smtp_pass: "", smtp_from: "", smtp_enabled: "false" };
-const DEFAULT_ATT: AttendanceSettings = { type: "fixed", checkInTime: "08:00", checkOutTime: "17:00", requiredHours: 8, lateToleranceMinutes: 15 };
 
 export default function SettingsPage() {
   const { t } = useLang();
-  const [att, setAtt] = useState<AttendanceSettings>(DEFAULT_ATT);
-  const [attSaved, setAttSaved] = useState(false);
   const [smtp, setSmtp] = useState<SmtpSettings>(DEFAULT_SMTP);
   const [smtpSaved, setSmtpSaved] = useState(false);
   const [smtpTesting, setSmtpTesting] = useState(false);
@@ -131,16 +120,9 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    fetch("/api/settings/attendance").then(r => r.json()).then(d => { if (d) setAtt(d); });
     fetch("/api/settings/smtp").then(r => r.json()).then(d => { if (d) setSmtp(s => ({ ...s, ...d })); });
     loadBackups();
   }, []);
-
-  const saveAtt = async () => {
-    await fetch("/api/settings/attendance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(att) });
-    setAttSaved(true);
-    setTimeout(() => setAttSaved(false), 3000);
-  };
 
   const saveSmtp = async () => {
     await fetch("/api/settings/smtp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(smtp) });
@@ -168,78 +150,24 @@ export default function SettingsPage() {
         <p className="text-sm text-gray-500 mt-1">{t("إعدادات الموقع والدوام")}</p>
       </div>
 
-      {/* ===== إعدادات الدوام ===== */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Clock className="h-4 w-4 text-sky-600" />
-            {t("إعدادات الدوام")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {/* نوع الدوام */}
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            <button
-              onClick={() => setAtt(a => ({ ...a, type: "fixed" }))}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${att.type === "fixed" ? "border-sky-600 bg-sky-50" : "border-gray-200 hover:border-gray-300"}`}
-            >
-              <Clock className={`h-6 w-6 ${att.type === "fixed" ? "text-sky-600" : "text-gray-400"}`} />
-              <div className="text-center">
-                <p className={`font-semibold text-sm ${att.type === "fixed" ? "text-sky-700" : "text-gray-700"}`}>{t("دوام ثابت")}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{t("وقت دخول وخروج محدد")}</p>
-              </div>
-            </button>
-            <button
-              onClick={() => setAtt(a => ({ ...a, type: "flexible" }))}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${att.type === "flexible" ? "border-sky-600 bg-sky-50" : "border-gray-200 hover:border-gray-300"}`}
-            >
-              <Timer className={`h-6 w-6 ${att.type === "flexible" ? "text-sky-600" : "text-gray-400"}`} />
-              <div className="text-center">
-                <p className={`font-semibold text-sm ${att.type === "flexible" ? "text-sky-700" : "text-gray-700"}`}>{t("دوام مرن")}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{t("عدد ساعات يومية فقط")}</p>
-              </div>
-            </button>
+      {/* ===== إعدادات الدوام — تم نقلها لصفحة جداول الدوام ===== */}
+      <Card className="border-sky-200 dark:border-sky-800">
+        <CardContent className="p-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-sky-100 dark:bg-sky-900/30 rounded-xl flex items-center justify-center shrink-0">
+              <Clock className="h-5 w-5 text-sky-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-sm">{t("إعدادات الدوام والشيفتات")}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">تم دمجها في صفحة جداول الدوام — الشيفتات، الاستثناءات، وإعدادات الحضور الافتراضية</p>
+            </div>
           </div>
-
-          {att.type === "fixed" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <Label>{t("وقت الحضور")}</Label>
-                <Input type="time" value={att.checkInTime} onChange={e => setAtt(a => ({ ...a, checkInTime: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>{t("وقت الانصراف")}</Label>
-                <Input type="time" value={att.checkOutTime} onChange={e => setAtt(a => ({ ...a, checkOutTime: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>{t("مهلة التأخير (دقيقة)")}</Label>
-                <Input
-                  type="number" min={0} max={60}
-                  value={att.lateToleranceMinutes}
-                  onChange={e => setAtt(a => ({ ...a, lateToleranceMinutes: parseInt(e.target.value) || 0 }))}
-                />
-                <p className="text-xs text-gray-400">{t("يُحسب متأخراً بعد هذه الدقائق")}</p>
-              </div>
-            </div>
-          ) : (
-            <div className="max-w-xs space-y-1">
-              <Label>{t("عدد ساعات العمل اليومية المطلوبة")}</Label>
-              <Input
-                type="number" min={1} max={24}
-                value={att.requiredHours}
-                onChange={e => setAtt(a => ({ ...a, requiredHours: parseFloat(e.target.value) || 8 }))}
-              />
-              <p className="text-xs text-gray-400">{t("الموظف يجب أن يكمل هذا العدد من الساعات يومياً")}</p>
-            </div>
-          )}
-
-          <div className="mt-4 flex items-center gap-3">
-            <Button onClick={saveAtt} className="gap-2">
-              <Save className="h-4 w-4" />
-              {attSaved ? `✓ ${t("تم الحفظ!")}` : t("حفظ إعدادات الدوام")}
+          <Link href="/shifts">
+            <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
+              <ArrowLeft className="h-3.5 w-3.5" />
+              الذهاب
             </Button>
-            {attSaved && <span className="text-sm text-green-600">{t("تم حفظ إعدادات الدوام بنجاح")}</span>}
-          </div>
+          </Link>
         </CardContent>
       </Card>
 
