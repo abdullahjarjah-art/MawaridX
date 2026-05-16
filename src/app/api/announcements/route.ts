@@ -47,15 +47,32 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
+    if (!["hr", "admin"].includes(session.role)) {
+      return NextResponse.json({ error: "غير مصرح لك بإنشاء الإعلانات" }, { status: 403 });
+    }
     const body = await req.json();
+    if (!body?.title || !body?.content) {
+      return NextResponse.json({ error: "العنوان والمحتوى مطلوبان" }, { status: 400 });
+    }
+
+    // اشتقاق المؤلف من جلسة المستخدم — لا نقبله من الـ body
+    let authorName = session.email;
+    if (session.employeeId) {
+      const emp = await prisma.employee.findUnique({
+        where: { id: session.employeeId },
+        select: { firstName: true, lastName: true },
+      });
+      if (emp) authorName = `${emp.firstName} ${emp.lastName}`.trim();
+    }
+
     const announcement = await prisma.announcement.create({
       data: {
         title: body.title,
         content: body.content,
         scope: body.scope ?? "company",
         department: body.scope === "department" ? body.department : null,
-        authorId: body.authorId,
-        authorName: body.authorName,
+        authorId: session.userId,
+        authorName,
         priority: body.priority ?? "normal",
       },
     });

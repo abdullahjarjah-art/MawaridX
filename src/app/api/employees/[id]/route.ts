@@ -112,13 +112,64 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
+  if (!["hr", "admin"].includes(session.role)) {
+    return NextResponse.json({ error: "غير مصرح لك بحذف الموظفين" }, { status: 403 });
+  }
 
   const { id } = await params;
-  await prisma.employee.delete({ where: { id } });
-  return NextResponse.json({ success: true });
+  const { searchParams } = new URL(req.url);
+  const force = searchParams.get("force") === "1";
+
+  try {
+    const emp = await prisma.employee.findUnique({ where: { id }, select: { id: true, userId: true } });
+    if (!emp) return NextResponse.json({ error: "الموظف غير موجود" }, { status: 404 });
+
+    // عدّ السجلات المرتبطة قبل اتخاذ القرار
+    const [attendance, leaves, salaries, evals, requests] = await Promise.all([
+      prisma.attendance.count({ where: { employeeId: id } }),
+      prisma.leave.count({ where: { employeeId: id } }),
+      prisma.salary.count({ where: { employeeId: id } }),
+      prisma.evaluation.count({ where: { employeeId: id } }),
+      prisma.request.count({ where: { employeeId: id } }),
+    ]);
+    const refs = attendance + leaves + salaries + evals + requests;
+
+    if (refs > 0 && !force) {
+      return NextResponse.json({
+        error: "للموظف سجلات مرتبطة — أضف ?force=1 للحذف الكامل أو غيّر حالته لـ \"غير نشط\" بدل الحذف",
+        counts: { attendance, leaves, salaries, evaluations: evals, requests },
+        suggestion: "soft_delete",
+      }, { status: 409 });
+    }
+
+    // تنظيف السجلات التابعة بالترتيب الصحيح ثم حذف الموظف
+    await prisma.$transaction(async (tx) => {
+      await tx.attendance.deleteMany({ where: { employeeId: id } });
+      await tx.leave.deleteMany({ where: { employeeId: id } });
+      await tx.salary.deleteMany({ where: { employeeId: id } });
+      await tx.evaluation.deleteMany({ where: { employeeId: id } });
+      await tx.request.deleteMany({ where: { employeeId: id } });
+      await tx.leaveBalance.deleteMany({ where: { employeeId: id } });
+      await tx.disciplinary.deleteMany({ where: { employeeId: id } });
+      await tx.employeeShift.deleteMany({ where: { employeeId: id } });
+      await tx.employeeWorkLocation.deleteMany({ where: { employeeId: id } });
+      await tx.employeeTraining.deleteMany({ where: { employeeId: id } });
+      await tx.document.deleteMany({ where: { employeeId: id } });
+      await tx.custody.deleteMany({ where: { employeeId: id } });
+      await tx.employee.delete({ where: { id } });
+      if (emp.userId) {
+        try { await tx.user.delete({ where: { id: emp.userId } }); } catch { /* user may already be gone */ }
+      }
+    });
+
+    return NextResponse.json({ success: true, removedReferences: refs });
+  } catch (err) {
+    console.error("Delete employee error:", err);
+    return NextResponse.json({ error: "تعذّر حذف الموظف", details: err instanceof Error ? err.message : String(err) }, { status: 500 });
+  }
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
