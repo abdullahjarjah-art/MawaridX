@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 
 const PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/reset-password", "/api/auth/login", "/api/auth/register", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/verify-otp"];
-const HR_ONLY_PATHS = ["/dashboard", "/employees", "/attendance", "/salaries", "/recruitment", "/evaluations", "/training"];
+const HR_ONLY_PATHS = ["/dashboard", "/employees", "/attendance", "/salaries", "/evaluations"];
 const EMPLOYEE_PATHS = ["/portal"];
 
 /** Apply security headers to every response (Next.js Edge runtime). */

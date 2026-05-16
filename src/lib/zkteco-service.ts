@@ -100,6 +100,10 @@ export async function processAttendancePunch({
   if (shift?.workDays) {
     const workDaysList = shift.workDays.split(",").map(Number);
     if (!workDaysList.includes(attTime.getDay())) return; // skip — not a work day
+  } else {
+    // No shift → reject Friday/Saturday as default weekend
+    const dow = attTime.getDay();
+    if (dow === 5 || dow === 6) return; // skip — default weekend
   }
 
   // Get existing attendance for this day

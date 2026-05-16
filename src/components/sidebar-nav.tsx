@@ -73,10 +73,8 @@ const navItems = [
   { href: "/salaries", label: "الرواتب", icon: DollarSign },
   { href: "/contracts",      label: "العقود",            icon: FileText },
   { href: "/company-docs",   label: "مستندات المنشأة",  icon: FolderOpen },
-  { href: "/recruitment", label: "التوظيف", icon: UserPlus },
   { href: "/evaluations", label: "تقييم الأداء", icon: Star },
   { href: "/saudization", label: "نطاقات السعودة", icon: Flag },
-  { href: "/training", label: "التدريب والتطوير", icon: BookOpen },
   { href: "/audit-log", label: "سجل التدقيق", icon: Shield },
   { href: "/settings", label: "الإعدادات", icon: Settings },
 ];

@@ -97,19 +97,16 @@ export default function AttendancePage() {
   const monthNames = [t("يناير"),t("فبراير"),t("مارس"),t("أبريل"),t("مايو"),t("يونيو"),t("يوليو"),t("أغسطس"),t("سبتمبر"),t("أكتوبر"),t("نوفمبر"),t("ديسمبر")];
   const years = [String(now.getFullYear() - 1), String(now.getFullYear()), String(now.getFullYear() + 1)];
 
-  const fetchAttendance = async (p = attPage) => {
-    const params = new URLSearchParams({ month, year, page: String(p), pageSize: String(ATT_PAGE_SIZE) });
+  const fetchAttendance = async (_p = 1) => {
+    // كل سجلات الشهر في صفحة واحدة (بدون pagination)
+    const params = new URLSearchParams({ month, year, all: "1" });
     const res = await fetch(`/api/attendance?${params}`);
     const data = await res.json();
-    if (data.data) {
-      setAttendance(data.data);
-      setAttTotal(data.total);
-      setAttTotalPages(data.totalPages);
-      setHolidays(data.holidays ?? []);
-    } else {
-      setAttendance(Array.isArray(data) ? data : []);
-      setHolidays([]);
-    }
+    const records: Attendance[] = data?.data ?? (Array.isArray(data) ? data : []);
+    setAttendance(records);
+    setAttTotal(records.length);
+    setAttTotalPages(1);
+    setHolidays(data?.holidays ?? []);
   };
 
   const fetchLeaves = async () => {
@@ -137,7 +134,6 @@ export default function AttendancePage() {
   };
 
   useEffect(() => { fetchData(); }, [month, year]);
-  useEffect(() => { fetchAttendance(attPage); }, [attPage]);
   // لما يتغير الفلتر بالموظف → أعد جلب الإجازات
   useEffect(() => { fetchLeaves(); }, [filterEmp, month, year]);
 
@@ -368,33 +364,118 @@ export default function AttendancePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {/* ── صف العطل الرسمية ── */}
-                  {holidays.filter(h => {
-                    const hDate = new Date(h.date).toISOString().slice(0, 10);
-                    if (filterDay && hDate !== filterDay) return false;
-                    return true;
-                  }).map(h => (
-                    <tr key={`holiday-${h.date}`} className="bg-orange-50/60 dark:bg-orange-900/10">
-                      <td className="px-4 py-3" colSpan={2}>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">🎉</span>
-                          <div>
-                            <p className="font-medium text-orange-700 dark:text-orange-400 text-sm">{h.name}</p>
-                            <p className="text-xs text-orange-500">{new Date(h.date).toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "long" })}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs px-2 py-1 rounded-full font-medium bg-orange-100 text-orange-700 border border-orange-200">
-                          {t("عطلة رسمية")}
-                        </span>
-                      </td>
-                      <td colSpan={7} className="px-4 py-3 text-xs text-orange-400">{t("لا يُحسب غياباً")}</td>
-                    </tr>
-                  ))}
-                  {filteredAtt.length === 0 && holidays.filter(h => !filterDay || new Date(h.date).toISOString().slice(0, 10) === filterDay).length === 0 ? (
-                    <tr><td colSpan={10} className="px-4 py-12 text-center text-gray-500">{t("لا توجد سجلات لهذا الشهر")}</td></tr>
-                  ) : filteredAtt.map(a => {
+                  {(() => {
+                    // ── دمج العطل + الإجازات المعتمدة + سجلات الحضور وترتيبها بالتاريخ تنازليًا ──
+                    const attDates = new Set(filteredAtt.map(a => new Date(a.date).toISOString().slice(0, 10)));
+
+                    // حدود الشهر الحالي (لتقييد الإجازات داخل النطاق)
+                    const monthStart = new Date(Number(year), Number(month) - 1, 1);
+                    const monthEnd = new Date(Number(year), Number(month), 1);
+
+                    // فلتر للإجازات المعتمدة المتطابقة مع فلاتر الموظف/البحث
+                    const matchesPersonFilter = (emp: { firstName: string; lastName: string; employeeNumber: string }, employeeId: string) => {
+                      if (filterEmp !== "all" && employeeId !== filterEmp) return false;
+                      if (searchName && !`${emp.firstName} ${emp.lastName} ${emp.employeeNumber}`.toLowerCase().includes(searchName.toLowerCase())) return false;
+                      return true;
+                    };
+
+                    // توسيع كل إجازة معتمدة إلى سجلات يومية ضمن الشهر، باستثناء الأيام التي فيها بصمة
+                    type LeaveRow = { kind: "lev"; date: string; leave: Leave };
+                    const leaveRows: LeaveRow[] = [];
+                    for (const lv of leaves) {
+                      if (lv.status !== "approved") continue;
+                      if (!matchesPersonFilter(lv.employee, lv.employeeId)) continue;
+                      const s = new Date(lv.startDate); s.setHours(0,0,0,0);
+                      const e = new Date(lv.endDate);   e.setHours(0,0,0,0);
+                      // قص الفترة على الشهر
+                      const from = s < monthStart ? new Date(monthStart) : s;
+                      const to   = e >= monthEnd  ? new Date(monthEnd.getTime() - 86400000) : e;
+                      for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+                        const iso = d.toISOString().slice(0, 10);
+                        if (filterDay && iso !== filterDay) continue;
+                        if (attDates.has(iso)) continue; // فيه بصمة → نتجنب التكرار
+                        leaveRows.push({ kind: "lev", date: iso, leave: lv });
+                      }
+                    }
+
+                    const rows: Array<
+                      | { kind: "att"; date: string; a: typeof filteredAtt[number] }
+                      | { kind: "hol"; date: string; h: { date: string; name: string; type: string } }
+                      | LeaveRow
+                    > = [
+                      ...filteredAtt.map(a => ({
+                        kind: "att" as const,
+                        date: new Date(a.date).toISOString().slice(0, 10),
+                        a,
+                      })),
+                      ...holidays
+                        .filter(h => {
+                          const hDate = new Date(h.date).toISOString().slice(0, 10);
+                          if (filterDay && hDate !== filterDay) return false;
+                          if (attDates.has(hDate)) return false; // عطلة وفيها بصمة → تظهر بسطر الحضور مع وسم
+                          return true;
+                        })
+                        .map(h => ({ kind: "hol" as const, date: new Date(h.date).toISOString().slice(0, 10), h })),
+                      ...leaveRows,
+                    ];
+                    rows.sort((x, y) => y.date.localeCompare(x.date));
+
+                    if (rows.length === 0) {
+                      return (
+                        <tr><td colSpan={10} className="px-4 py-12 text-center text-gray-500">{t("لا توجد سجلات لهذا الشهر")}</td></tr>
+                      );
+                    }
+                    return rows.map(row => {
+                      if (row.kind === "hol") {
+                        const h = row.h;
+                        return (
+                          <tr key={`holiday-${h.date}`} className="bg-orange-50/60 dark:bg-orange-900/10">
+                            <td className="px-4 py-3" colSpan={2}>
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">🎉</span>
+                                <div>
+                                  <p className="font-medium text-orange-700 dark:text-orange-400 text-sm">{h.name}</p>
+                                  <p className="text-xs text-orange-500">{new Date(h.date).toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "long" })}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs px-2 py-1 rounded-full font-medium bg-orange-100 text-orange-700 border border-orange-200">
+                                {t("عطلة رسمية")}
+                              </span>
+                            </td>
+                            <td colSpan={7} className="px-4 py-3 text-xs text-orange-400">{t("لا يُحسب غياباً")}</td>
+                          </tr>
+                        );
+                      }
+                      if (row.kind === "lev") {
+                        const lv = row.leave;
+                        return (
+                          <tr key={`leave-${lv.id}-${row.date}`} className="bg-purple-50/60 dark:bg-purple-900/10">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <EmployeeAvatar photo={undefined} firstName={lv.employee.firstName} lastName={lv.employee.lastName} size="sm" />
+                                <div>
+                                  <p className="font-medium text-gray-900 text-sm">{lv.employee.firstName} {lv.employee.lastName}</p>
+                                  <p className="text-xs text-gray-400">{lv.employee.employeeNumber}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">
+                              {new Date(row.date).toLocaleDateString("ar-SA", { weekday: "short", day: "numeric", month: "short" })}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs px-2 py-1 rounded-full font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                                {t("إجازة")} {leaveTypeMap[lv.type] ?? lv.type}
+                              </span>
+                            </td>
+                            <td colSpan={7} className="px-4 py-3 text-xs text-purple-500">
+                              {lv.reason ? lv.reason : t("لا يُحسب غياباً")}
+                            </td>
+                          </tr>
+                        );
+                      }
+                      const a = row.a;
                     const lateMins = a.status === "late" ? getLateMins(a.checkIn) : 0;
                     const st = attendanceStatusMap[a.status];
                     // هل هذا اليوم عطلة؟ (لتمييز الصف)
@@ -505,11 +586,14 @@ export default function AttendancePage() {
                         </td>
                       </tr>
                     );
-                  })}
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
-            <Pagination page={attPage} totalPages={attTotalPages} total={attTotal} pageSize={ATT_PAGE_SIZE} onPage={p => { setAttPage(p); }} />
+            <div className="px-4 py-2 text-xs text-muted-foreground border-t">
+              {t("إجمالي السجلات")}: {attTotal}
+            </div>
           </div>
         </TabsContent>
 

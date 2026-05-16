@@ -77,24 +77,41 @@ export default function HolidaysPage() {
   const handleSave = async () => {
     if (!form.name || !form.date) return;
     setLoading(true);
-    if (editTarget) {
-      await fetch(`/api/holidays/${editTarget.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-    } else {
-      await fetch("/api/holidays", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+    let ok = true;
+    try {
+      if (editTarget) {
+        const res = await fetch(`/api/holidays/${editTarget.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+        ok = res.ok;
+      } else {
+        const res = await fetch("/api/holidays", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+        ok = res.ok;
+      }
+    } catch {
+      ok = false;
     }
+    setLoading(false);
+    if (!ok) {
+      alert("تعذّر حفظ العطلة");
+      return;
+    }
+    // sync calendar to the holiday's month/year then switch view
+    const d = new Date(form.date);
+    setCalMonth(d.getMonth());
+    setCalYear(d.getFullYear());
+    setYear(String(d.getFullYear()));
     setOpen(false);
     setForm(EMPTY_FORM);
     setEditTarget(null);
-    reload(year);
-    setLoading(false);
+    await reload(String(d.getFullYear()));
+    setView("calendar");
   };
 
   const handleDelete = async (id: string) => {
@@ -111,9 +128,12 @@ export default function HolidaysPage() {
       body: JSON.stringify({ importDefaults: true, year: Number(year) }),
     });
     const data = await res.json();
-    if (data.error) alert(data.error);
-    else reload(year);
     setImporting(false);
+    if (data.error) { alert(data.error); return; }
+    if (data.note) alert(`تم استيراد ${data.count ?? ""} عطلة\n${data.note}`);
+    await reload(year);
+    setCalYear(Number(year));
+    setView("calendar");
   };
 
   // ── Calendar helpers ───────────────────────────────────────
@@ -385,8 +405,9 @@ export default function HolidaysPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>{t("إلغاء")}</Button>
-            <Button onClick={handleSave} disabled={loading || !form.name || !form.date}>
-              {editTarget ? t("حفظ التعديلات") : t("إضافة")}
+            <Button onClick={handleSave} disabled={loading || !form.name || !form.date} className="gap-1.5">
+              <CalendarDays className="h-4 w-4" />
+              {loading ? t("جارٍ الحفظ...") : (editTarget ? t("حفظ التعديلات") : t("حفظ وإضافة للتقويم"))}
             </Button>
           </DialogFooter>
         </DialogContent>

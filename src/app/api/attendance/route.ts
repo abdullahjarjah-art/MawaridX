@@ -67,11 +67,29 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const employeeId = body.employeeId;
 
-  // منع البصمة لأي موظف في إجازة رسمية معتمدة
+  // ── منع البصمة في العطل / الإجازات / الويك إند ──
+  // (مسموح للـ HR/admin يتجاوز بإرسال bypassLeaveCheck:true / bypassHolidayCheck:true / bypassWeekendCheck:true)
   if (employeeId && body.checkIn) {
     const recordDate = body.date ? new Date(body.date) : new Date();
     recordDate.setHours(0, 0, 0, 0);
+    const nextDay = new Date(recordDate);
+    nextDay.setDate(nextDay.getDate() + 1);
 
+    // 1) عطلة رسمية مسجلة لذلك اليوم
+    if (!body.bypassHolidayCheck) {
+      const holiday = await prisma.holiday.findFirst({
+        where: { date: { gte: recordDate, lt: nextDay } },
+        select: { name: true },
+      });
+      if (holiday) {
+        return NextResponse.json(
+          { error: `هذا اليوم عطلة رسمية (${holiday.name}) — لا يمكن تسجيل البصمة` },
+          { status: 403 }
+        );
+      }
+    }
+
+    // 2) إجازة معتمدة تشمل اليوم
     const activeLeave = await prisma.leave.findFirst({
       where: {
         employeeId,
@@ -81,7 +99,6 @@ export async function POST(req: NextRequest) {
       },
       select: { type: true, endDate: true },
     });
-
     if (activeLeave) {
       const leaveTypeMap: Record<string, string> = {
         annual: "سنوية", sick: "مرضية", emergency: "طارئة",
@@ -93,6 +110,25 @@ export async function POST(req: NextRequest) {
         { error: `الموظف في إجازة ${typeName} حتى ${endStr} — لا يمكن تسجيل البصمة` },
         { status: 403 }
       );
+    }
+
+    // 3) Weekend (الجمعة=5 / السبت=6) — إن لم يكن للموظف شيفت يحدد أيام دوامه
+    //    التحقق الفعلي بأيام الدوام يحدث أدناه عند جلب الشيفت؛ هذا الفحص للموظفين بدون شيفت.
+    if (!body.bypassWeekendCheck) {
+      const empShift = await prisma.employeeShift.findFirst({
+        where: { employeeId, endDate: null },
+        select: { id: true },
+      });
+      if (!empShift) {
+        const dow = recordDate.getDay();
+        if (dow === 5 || dow === 6) {
+          const dayNames = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+          return NextResponse.json(
+            { error: `${dayNames[dow]} يوم عطلة أسبوعية — لا يمكن تسجيل البصمة` },
+            { status: 403 }
+          );
+        }
+      }
     }
   }
 

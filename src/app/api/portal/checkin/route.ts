@@ -173,6 +173,15 @@ export async function POST(req: NextRequest) {
         { status: 403 },
       );
     }
+  } else {
+    // ── fallback Weekend: لا يوجد شيفت — رفض الجمعة/السبت ──
+    const dow = now.getDay();
+    if (dow === 5 || dow === 6) {
+      return NextResponse.json(
+        { error: `اليوم (${dayNameAr(dow)}) عطلة أسبوعية — لا يمكن تسجيل البصمة` },
+        { status: 403 },
+      );
+    }
   }
 
   const existing = await prisma.attendance.findFirst({
