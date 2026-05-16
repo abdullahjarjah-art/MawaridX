@@ -51,7 +51,7 @@ const PLAN_FEATURES: Record<Plan, FeatureMap> = {
     trainingTracking:    false,
     recruitment:         false,
     aiInsights:          false,
-    customBranding:      false,
+    customBranding:      true,   // ← مفعّلة حتى في النسخة التجريبية
     apiAccess:           false,
     maxEmployees:        10,
     maxStorageGB:        1,
