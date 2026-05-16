@@ -18,6 +18,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const body = await req.json();
   const action = body.status; // "manager_approved" | "approved" | "rejected"
 
+  // ── ضوابط الأدوار ──
+  // المدير يقدر فقط: manager_approved + rejected (على الموظفين التابعين له)
+  // HR/admin يقدر: approved (نهائي) + rejected
+  if (session.role === "manager" && action === "approved") {
+    return NextResponse.json({ error: "الموافقة النهائية لـ HR/الإدارة فقط" }, { status: 403 });
+  }
+  if (session.role === "manager" && action !== "manager_approved" && action !== "rejected") {
+    return NextResponse.json({ error: "المدير يقدر يعمل موافقة مرحلية أو رفض فقط" }, { status: 403 });
+  }
+
   // جلب الإجازة الحالية
   const current = await prisma.leave.findUnique({
     where: { id },
@@ -27,6 +37,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const typeName = leaveTypeMap[current.type] ?? current.type;
   const empName = `${current.employee.firstName} ${current.employee.lastName}`;
+
+  // المدير يقدر يتدخل فقط مع الموظفين التابعين له مباشرةً
+  if (session.role === "manager") {
+    const myEmp = session.employeeId
+      ? await prisma.employee.findUnique({ where: { id: session.employeeId }, select: { id: true } })
+      : null;
+    if (!myEmp || current.employee.managerId !== myEmp.id) {
+      return NextResponse.json({ error: "هذا الموظف ليس تحت إدارتك" }, { status: 403 });
+    }
+  }
 
   // رفض - يمكن للمدير أو الأدمن
   if (action === "rejected") {

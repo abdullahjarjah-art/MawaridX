@@ -44,6 +44,15 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
   const body = await req.json();
 
+  // ── ضمان أن الموظف العادي يقدّم لنفسه فقط ──
+  if (session.role === "employee") {
+    if (!session.employeeId) {
+      return NextResponse.json({ error: "حساب الموظف غير مربوط بسجل موظف" }, { status: 403 });
+    }
+    // أي محاولة لتحديد employeeId مختلف تُعاد بقوة لمعرّف صاحب الجلسة
+    body.employeeId = session.employeeId;
+  }
+
   // ── التحقق من المدخلات ──
   if (!body.employeeId) return NextResponse.json({ error: "الموظف مطلوب" }, { status: 400 });
   if (!body.type)       return NextResponse.json({ error: "نوع الإجازة مطلوب" }, { status: 400 });
